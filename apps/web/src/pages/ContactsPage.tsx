@@ -1,15 +1,9 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createDirectConversation } from '../api/chat';
+import { loadContacts, type ContactRow } from '../api/contacts';
 import { getErrorMessage } from '../api/loadable';
 import DataModeNotice from '../components/DataModeNotice';
-
-const contacts = [
-  { id: 'c-1', name: '运营通知', phone: '855010100001', tag: '系统' },
-  { id: 'c-2', name: '商务对接', phone: '855010100002', tag: '商务' },
-  { id: 'c-3', name: '渠道伙伴', phone: '855010100003', tag: '代理' },
-  { id: 'c-4', name: '安全专员', phone: '855010100004', tag: '安全' }
-];
 
 const contactEntries = [
   { title: '新的朋友', subtitle: '查看新的添加请求', to: '/h5/contacts/friends', icon: '友' },
@@ -21,13 +15,39 @@ const contactEntries = [
 export default function ContactsPage() {
   const navigate = useNavigate();
   const [keyword, setKeyword] = React.useState('');
+  const [contacts, setContacts] = React.useState<ContactRow[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    void loadContacts()
+      .then((data) => {
+        if (cancelled) return;
+        setContacts(data);
+        setErrorMessage(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setErrorMessage(getErrorMessage(error, '联系人加载失败，请稍后重试'));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const rows = React.useMemo(() => {
     const normalized = keyword.trim().toLowerCase();
     if (!normalized) return contacts;
     return contacts.filter((contact) => {
-      return [contact.name, contact.phone, contact.tag].some((value) =>
+      return [contact.name, contact.phone, contact.note, ...contact.tags.map((tag) => tag.title)].some((value) =>
         value.toLowerCase().includes(normalized)
       );
     });
@@ -77,20 +97,39 @@ export default function ContactsPage() {
             placeholder="输入昵称、手机号或标签"
           />
         </label>
-        <DataModeNotice message="通讯录当前展示演示联系人列表，发起单聊仍会优先调用真实创建会话接口。" />
+        <Link className="primary-link-card" to="/h5/discover/search">
+          <strong>添加朋友</strong>
+          <span>通过手机号或昵称搜索，进入资料页发送好友申请。</span>
+        </Link>
+        <DataModeNotice message="通讯录已切换到接口驱动，可进入联系人详情继续完成发送申请、删除、拉黑、举报与标签管理。" />
         {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
+        {loading ? <p className="conversation-state">联系人加载中...</p> : null}
 
-        {rows.map((contact) => (
+        {!loading && rows.map((contact) => (
           <article key={contact.id} className="contact-card">
             <div>
               <strong>{contact.name}</strong>
               <span>{contact.phone}</span>
+              <span>{contact.tags.length ? contact.tags.map((tag) => tag.title).join(' / ') : '未分配标签'}</span>
             </div>
-            <button className="mini-link button-link" type="button" onClick={() => handleStartChat(contact.phone)}>
-              发起单聊
-            </button>
+            <div className="detail-actions">
+              <Link className="mini-link" to={`/h5/contacts/profile/${encodeURIComponent(contact.phone)}`}>
+                查看资料
+              </Link>
+              <button className="mini-link button-link" type="button" onClick={() => handleStartChat(contact.phone)}>
+                发起单聊
+              </button>
+            </div>
           </article>
         ))}
+        {!loading && !rows.length ? (
+          <article className="contact-card">
+            <div>
+              <strong>暂无联系人</strong>
+              <span>可以从搜索入口发送申请，或在新的朋友页处理待通过请求。</span>
+            </div>
+          </article>
+        ) : null}
       </div>
     </section>
   );

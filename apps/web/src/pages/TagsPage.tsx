@@ -1,23 +1,47 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { createContactTag, loadContactTags, type ContactTagRow } from '../api/contacts';
+import {
+  addTagMember,
+  createContactTag,
+  loadContactTags,
+  loadContacts,
+  loadTagMembers,
+  removeTagMember,
+  type ContactRow,
+  type ContactTagRow
+} from '../api/contacts';
 import { getErrorMessage } from '../api/loadable';
 
 export default function TagsPage() {
   const [query, setQuery] = React.useState('');
   const [newTagTitle, setNewTagTitle] = React.useState('');
   const [tags, setTags] = React.useState<ContactTagRow[]>([]);
+  const [contacts, setContacts] = React.useState<ContactRow[]>([]);
+  const [selectedContactMap, setSelectedContactMap] = React.useState<Record<string, string>>({});
   const [loading, setLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
+  const [actingTagId, setActingTagId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
 
-    void loadContactTags()
-      .then((data) => {
+    void Promise.all([loadContactTags(), loadContacts()])
+      .then(async ([tagData, contactData]) => {
         if (cancelled) return;
-        setTags(data);
+        const membersByTag = await Promise.all(
+          tagData.map(async (tag) => ({
+            tagId: tag.id,
+            members: await loadTagMembers(tag.id)
+          }))
+        );
+        if (cancelled) return;
+        const nextTags = tagData.map((tag) => ({
+          ...tag,
+          members: membersByTag.find((item) => item.tagId === tag.id)?.members || tag.members
+        }));
+        setTags(nextTags);
+        setContacts(contactData);
         setErrorMessage(null);
       })
       .catch((error) => {
@@ -39,9 +63,13 @@ export default function TagsPage() {
     const keyword = query.trim().toLowerCase();
     if (!keyword) return tags;
     return tags.filter((item) =>
-      `${item.title} ${item.note} ${item.members.join(' ')}`.toLowerCase().includes(keyword)
+      `${item.title} ${item.note} ${item.members.map((member) => `${member.name} ${member.phone}`).join(' ')}`.toLowerCase().includes(keyword)
     );
   }, [query, tags]);
+
+  const replaceTag = React.useCallback((tagId: string, updater: (tag: ContactTagRow) => ContactTagRow) => {
+    setTags((current) => current.map((tag) => (tag.id === tagId ? updater(tag) : tag)));
+  }, []);
 
   return (
     <section className="h5-page">
@@ -112,11 +140,88 @@ export default function TagsPage() {
               </div>
               <p>{item.note}</p>
               <div className="tag-chip-row">
-                {item.members.length ? item.members.map((member) => (
-                  <span key={member} className="tag-chip">
-                    {member}
-                  </span>
-                )) : <span className="tag-chip">待添加成员</span>}
+                {item.members.length
+                  ? item.members.map((member) => (
+                      <span key={member.phone} className="tag-chip">
+                        {member.name}
+                        <button
+                          type="button"
+                          className="button-link"
+                          disabled={actingTagId === item.id}
+                          onClick={async () => {
+                            setActingTagId(item.id);
+                            try {
+                              await removeTagMember(item.id, member.phone);
+                              replaceTag(item.id, (tag) => ({
+                                ...tag,
+                                count: Math.max(0, tag.count - 1),
+                                members: tag.members.filter((current) => current.phone !== member.phone)
+                              }));
+                              setErrorMessage(null);
+                            } catch (error) {
+                              setErrorMessage(getErrorMessage(error, '移除标签成员失败，请稍后重试'));
+                            } finally {
+                              setActingTagId(null);
+                            }
+                          }}
+                        >
+                          移出
+                        </button>
+                      </span>
+                    ))
+                  : <span className="tag-chip">待添加成员</span>}
+              </div>
+              <div className="inline-form">
+                <select
+                  aria-label={`选择 ${item.title} 的联系人`}
+                  value={selectedContactMap[item.id] || ''}
+                  onChange={(event) =>
+                    setSelectedContactMap((current) => ({
+                      ...current,
+                      [item.id]: event.target.value
+                    }))
+                  }
+                >
+                  <option value="">选择联系人</option>
+                  {contacts
+                    .filter((contact) => !item.members.some((member) => member.phone === contact.phone))
+                    .map((contact) => (
+                      <option key={`${item.id}-${contact.phone}`} value={contact.phone}>
+                        {contact.name} ({contact.phone})
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  className="primary-button is-small"
+                  disabled={actingTagId === item.id || !selectedContactMap[item.id]}
+                  onClick={async () => {
+                    const contactPhone = selectedContactMap[item.id];
+                    if (!contactPhone) return;
+                    const target = contacts.find((contact) => contact.phone === contactPhone);
+                    if (!target) return;
+                    setActingTagId(item.id);
+                    try {
+                      await addTagMember(item.id, contactPhone);
+                      replaceTag(item.id, (tag) => ({
+                        ...tag,
+                        count: tag.count + 1,
+                        members: [...tag.members, { id: target.id, name: target.name, phone: target.phone }]
+                      }));
+                      setSelectedContactMap((current) => ({
+                        ...current,
+                        [item.id]: ''
+                      }));
+                      setErrorMessage(null);
+                    } catch (error) {
+                      setErrorMessage(getErrorMessage(error, '添加标签成员失败，请稍后重试'));
+                    } finally {
+                      setActingTagId(null);
+                    }
+                  }}
+                >
+                  {actingTagId === item.id ? '处理中...' : '添加成员'}
+                </button>
               </div>
             </article>
           ))}

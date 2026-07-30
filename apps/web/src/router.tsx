@@ -13,6 +13,7 @@ import AgentPage from './pages/AgentPage';
 import CardsPage from './pages/CardsPage';
 import ChannelsPage from './pages/ChannelsPage';
 import ChatPage from './pages/ChatPage';
+import ContactProfilePage from './pages/ContactProfilePage';
 import ContactsPage from './pages/ContactsPage';
 import DiscoverPage from './pages/DiscoverPage';
 import EarningsPage from './pages/EarningsPage';
@@ -45,6 +46,7 @@ export const appRoutes = [
   { path: '/discover', element: <DiscoverPage /> },
   { path: '/me', element: <MePage /> },
   { path: '/contacts/friends', element: <FriendsRequestsPage /> },
+  { path: '/contacts/profile/:targetPhone', element: <ContactProfilePage /> },
   { path: '/contacts/groups', element: <GroupChatsPage /> },
   { path: '/contacts/tags', element: <TagsPage /> },
   { path: '/contacts/official-accounts', element: <OfficialAccountsPage /> },

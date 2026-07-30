@@ -31,6 +31,30 @@ describe('App route entry', () => {
       vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         const method = init?.method || 'GET';
+        if (url.endsWith('/api/contacts') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              {
+                id: 'contact-1',
+                name: '商务对接',
+                phone: '855010100002',
+                note: '',
+                relationship: 'FRIEND',
+                tags: [{ id: 'tag-1', title: '渠道合作' }]
+              },
+              {
+                id: 'contact-2',
+                name: '安全专员',
+                phone: '855010100004',
+                note: '',
+                relationship: 'FRIEND',
+                tags: [{ id: 'tag-2', title: '安全与风控' }]
+              }
+            ]
+          });
+        }
+
         if (url.includes('/api/contacts/friend-requests') && method === 'GET') {
           return Promise.resolve({
             ok: true,
@@ -53,6 +77,19 @@ describe('App route entry', () => {
           });
         }
 
+        if (url.endsWith('/api/contacts/friend-requests') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              id: 'friend-created',
+              name: '渠道伙伴群',
+              phone: '855010100003',
+              note: '你好，想加你为好友。',
+              status: '待通过'
+            })
+          });
+        }
+
         if (url.includes('/api/contacts/friend-requests/') && method === 'POST') {
           return Promise.resolve({
             ok: true,
@@ -66,7 +103,72 @@ describe('App route entry', () => {
           });
         }
 
+        if (url.includes('/api/contacts/profile/') && method === 'GET') {
+          const targetPhone = decodeURIComponent(url.split('/api/contacts/profile/')[1] || '').split('?')[0];
+          const profileMap: Record<string, Record<string, unknown>> = {
+            '855010100002': {
+              id: 'contact-1',
+              name: '商务对接',
+              phone: '855010100002',
+              note: '重点商务沟通窗口',
+              relationship: 'FRIEND',
+              tags: [{ id: 'tag-1', title: '渠道合作' }],
+              requestId: 'friend-accepted',
+              requestNote: '长期合作沟通',
+              canSendMessage: true,
+              canSendRequest: false
+            },
+            '855010100003': {
+              id: 'contact-3',
+              name: '渠道伙伴群',
+              phone: '855010100003',
+              note: '你好，想加你为好友。',
+              relationship: 'NONE',
+              tags: [],
+              requestId: null,
+              requestNote: '',
+              canSendMessage: false,
+              canSendRequest: true
+            }
+          };
+          return Promise.resolve({
+            ok: true,
+            json: async () => profileMap[targetPhone] || profileMap['855010100003']
+          });
+        }
+
+        if (url.includes('/api/contacts/profile/') && method === 'POST') {
+          if (url.endsWith('/delete')) {
+            return Promise.resolve({
+              ok: true,
+              json: async () => ({ ok: true, status: 'REMOVED' })
+            });
+          }
+          if (url.endsWith('/block')) {
+            return Promise.resolve({
+              ok: true,
+              json: async () => ({ ok: true, status: 'BLOCKED' })
+            });
+          }
+          if (url.endsWith('/report')) {
+            return Promise.resolve({
+              ok: true,
+              json: async () => ({ id: 'report-1', status: 'OPEN' })
+            });
+          }
+        }
+
         if (url.includes('/api/contacts/tags') && method === 'GET') {
+          if (url.includes('/members')) {
+            return Promise.resolve({
+              ok: true,
+              json: async () => [
+                { id: 'contact-1', name: '商务对接', phone: '855010100002' },
+                { id: 'contact-3', name: '渠道伙伴群', phone: '855010100003' },
+                { id: 'contact-6', name: '运营小晴', phone: '855010188002' }
+              ]
+            });
+          }
           return Promise.resolve({
             ok: true,
             json: async () => [
@@ -74,14 +176,21 @@ describe('App route entry', () => {
                 id: 'tag-1',
                 title: '渠道合作',
                 count: 3,
-                members: ['商务对接', '渠道伙伴', '运营小晴'],
+                members: [
+                  { id: 'contact-1', name: '商务对接', phone: '855010100002' },
+                  { id: 'contact-3', name: '渠道伙伴群', phone: '855010100003' },
+                  { id: 'contact-6', name: '运营小晴', phone: '855010188002' }
+                ],
                 note: '用于日常合作、活动排期和投放沟通。'
               },
               {
                 id: 'tag-2',
                 title: '安全与风控',
                 count: 2,
-                members: ['安全专员', '风控专员 May'],
+                members: [
+                  { id: 'contact-2', name: '安全专员', phone: '855010100004' },
+                  { id: 'contact-7', name: '风控专员 May', phone: '855010188003' }
+                ],
                 note: '统一查看账号、设备、风控和告警相关联系人。'
               }
             ]
@@ -101,6 +210,13 @@ describe('App route entry', () => {
           });
         }
 
+        if (url.includes('/api/contacts/tags/') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ ok: true })
+          });
+        }
+
         if (url.includes('/api/search')) {
           const keyword = new URL(url, 'http://localhost').searchParams.get('keyword') || '';
           const rows = [
@@ -109,7 +225,7 @@ describe('App route entry', () => {
               title: '商务对接',
               subtitle: '联系人 · 855010100002',
               type: '联系人',
-              to: '/h5/contacts/friends'
+              to: '/h5/contacts/profile/855010100002'
             },
             {
               id: 'search-2',
@@ -561,6 +677,7 @@ describe('App route entry', () => {
   it('opens the contacts service pages', async () => {
     const routes = [
       { path: '/h5/contacts/friends', heading: '新的朋友' },
+      { path: '/h5/contacts/profile/855010100002', heading: '联系人资料' },
       { path: '/h5/contacts/groups', heading: '群聊' },
       { path: '/h5/contacts/tags', heading: '标签' },
       { path: '/h5/contacts/official-accounts', heading: '公众号' }
@@ -588,6 +705,7 @@ describe('App route entry', () => {
     expect(await screen.findByRole('link', { name: /新的朋友/ })).toHaveAttribute('href', '/h5/contacts/friends');
     expect(screen.getByRole('link', { name: /群聊/ })).toHaveAttribute('href', '/h5/contacts/groups');
     expect(screen.getByRole('link', { name: /标签/ })).toHaveAttribute('href', '/h5/contacts/tags');
+    expect(screen.getByRole('link', { name: /添加朋友/ })).toHaveAttribute('href', '/h5/discover/search');
     expect(screen.getByRole('link', { name: /公众号/ })).toHaveAttribute(
       'href',
       '/h5/contacts/official-accounts'
@@ -611,6 +729,37 @@ describe('App route entry', () => {
       target: { value: '' }
     });
     expect(await screen.findByText('重点跟进')).toBeInTheDocument();
+  });
+
+  it('manages tag members from api', async () => {
+    renderAt('/h5/contacts/tags', { token: 'demo-token' });
+
+    expect((await screen.findAllByText('商务对接')).length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText('选择 渠道合作 的联系人'), {
+      target: { value: '855010100004' }
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: '添加成员' })[0]);
+    expect((await screen.findAllByText('安全专员')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: '移出' })[0]);
+  });
+
+  it('shows contact profile actions and sends report', async () => {
+    renderAt('/h5/contacts/profile/855010100002', { token: 'demo-token' });
+
+    expect(await screen.findByText('当前状态：好友')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '发消息' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '删除好友' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '拉黑' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '提交举报' }));
+    expect(await screen.findByText('已提交对 商务对接 的举报。')).toBeInTheDocument();
+  });
+
+  it('sends friend request from contact profile', async () => {
+    renderAt('/h5/contacts/profile/855010100003', { token: 'demo-token' });
+
+    expect(await screen.findByRole('button', { name: '发送好友申请' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '发送好友申请' }));
+    expect(await screen.findByText('渠道伙伴群 的好友申请已发送。')).toBeInTheDocument();
   });
 
   it('opens the discover service pages', async () => {

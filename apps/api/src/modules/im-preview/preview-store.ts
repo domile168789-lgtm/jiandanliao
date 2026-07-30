@@ -57,6 +57,22 @@ type PreviewTag = {
   createdAt: string;
 };
 
+type PreviewBlock = {
+  id: string;
+  ownerUserId: string;
+  targetUserId: string;
+  createdAt: string;
+};
+
+type PreviewReport = {
+  id: string;
+  reporterUserId: string;
+  targetUserId: string;
+  reason: string;
+  status: 'OPEN';
+  createdAt: string;
+};
+
 type PreviewStoreState = {
   users: PreviewUser[];
   conversations: PreviewConversation[];
@@ -64,6 +80,8 @@ type PreviewStoreState = {
   receipts: PreviewReceipt[];
   friendRequests: PreviewFriendRequest[];
   tags: PreviewTag[];
+  blocks: PreviewBlock[];
+  reports: PreviewReport[];
 };
 
 const buildIso = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).toISOString();
@@ -308,7 +326,9 @@ const createInitialState = (): PreviewStoreState => ({
   ),
   receipts: [],
   friendRequests: seedFriendRequests.map((item) => ({ ...item })),
-  tags: seedTags.map((item) => ({ ...item, memberUserIds: [...item.memberUserIds] }))
+  tags: seedTags.map((item) => ({ ...item, memberUserIds: [...item.memberUserIds] })),
+  blocks: [],
+  reports: []
 });
 
 const state: PreviewStoreState = createInitialState();
@@ -396,8 +416,18 @@ const mapTagRow = (tag: PreviewTag) => ({
   title: tag.title,
   count: tag.memberUserIds.length,
   members: tag.memberUserIds
-    .map((userId) => getUserById(userId)?.nickname)
-    .filter((value): value is string => Boolean(value)),
+    .map((userId) => {
+      const user = getUserById(userId);
+      if (!user) {
+        return null;
+      }
+      return {
+        id: user.id,
+        name: user.nickname,
+        phone: user.phone
+      };
+    })
+    .filter((value): value is { id: string; name: string; phone: string } => Boolean(value)),
   note: tag.note,
   createdAt: tag.createdAt
 });
@@ -446,6 +476,88 @@ const findExistingDmConversation = (ownerUserId: string, peerUserId: string) =>
       item.members.includes(ownerUserId) &&
       item.members.includes(peerUserId)
   );
+
+const isBlockedByOwner = (ownerUserId: string, targetUserId: string) =>
+  state.blocks.some((item) => item.ownerUserId === ownerUserId && item.targetUserId === targetUserId);
+
+const findLatestRelationship = (ownerUserId: string, targetUserId: string) =>
+  [...state.friendRequests]
+    .filter(
+      (item) =>
+        (item.fromUserId === ownerUserId && item.toUserId === targetUserId) ||
+        (item.fromUserId === targetUserId && item.toUserId === ownerUserId)
+    )
+    .sort((a, b) => `${b.createdAt}`.localeCompare(`${a.createdAt}`))[0];
+
+const getOwnedTagsForMember = (ownerUserId: string, memberUserId: string) =>
+  state.tags
+    .filter((item) => item.ownerUserId === ownerUserId && item.memberUserIds.includes(memberUserId))
+    .map((item) => ({
+      id: item.id,
+      title: item.title
+    }));
+
+const hasAcceptedFriendship = (ownerUserId: string, targetUserId: string) =>
+  state.friendRequests.some(
+    (item) =>
+      item.status === 'ACCEPTED' &&
+      ((item.fromUserId === ownerUserId && item.toUserId === targetUserId) ||
+        (item.fromUserId === targetUserId && item.toUserId === ownerUserId))
+  );
+
+const buildRelationshipState = (ownerUserId: string, targetUserId: string) => {
+  if (ownerUserId === targetUserId) {
+    return 'SELF' as const;
+  }
+  if (isBlockedByOwner(ownerUserId, targetUserId)) {
+    return 'BLOCKED' as const;
+  }
+  const latest = findLatestRelationship(ownerUserId, targetUserId);
+  if (latest?.status === 'ACCEPTED' || hasAcceptedFriendship(ownerUserId, targetUserId)) {
+    return 'FRIEND' as const;
+  }
+  if (latest?.status === 'PENDING') {
+    return latest.toUserId === ownerUserId ? ('PENDING_INCOMING' as const) : ('PENDING_OUTGOING' as const);
+  }
+  return 'NONE' as const;
+};
+
+const mapContactSummary = (ownerUserId: string, targetUserId: string) => {
+  const user = getUserById(targetUserId);
+  if (!user) {
+    return null;
+  }
+  const latest = findLatestRelationship(ownerUserId, targetUserId);
+  return {
+    id: user.id,
+    name: user.nickname,
+    phone: user.phone,
+    tags: getOwnedTagsForMember(ownerUserId, targetUserId),
+    note: latest?.note || '',
+    relationship: buildRelationshipState(ownerUserId, targetUserId)
+  };
+};
+
+const mapContactProfile = (ownerUserId: string, targetUserId: string) => {
+  const user = getUserById(targetUserId);
+  if (!user) {
+    throw new Error('user not found');
+  }
+  const latest = findLatestRelationship(ownerUserId, targetUserId);
+  const relationship = buildRelationshipState(ownerUserId, targetUserId);
+  return {
+    id: user.id,
+    name: user.nickname,
+    phone: user.phone,
+    tags: getOwnedTagsForMember(ownerUserId, targetUserId),
+    note: latest?.note || '',
+    relationship,
+    requestId: latest?.id || null,
+    requestNote: latest?.note || '',
+    canSendMessage: relationship === 'FRIEND',
+    canSendRequest: relationship === 'NONE'
+  };
+};
 
 const toConversationRow = (conversation: PreviewConversation, currentUserId: string) => ({
   id: conversation.id,
@@ -509,6 +621,8 @@ export const previewStore = {
     state.conversations.splice(0, state.conversations.length, ...next.conversations);
     state.friendRequests.splice(0, state.friendRequests.length, ...next.friendRequests);
     state.tags.splice(0, state.tags.length, ...next.tags);
+    state.blocks.splice(0, state.blocks.length, ...next.blocks);
+    state.reports.splice(0, state.reports.length, ...next.reports);
     state.receipts.splice(0, state.receipts.length, ...next.receipts);
     for (const key of Object.keys(state.messages)) {
       delete state.messages[key];
@@ -768,6 +882,39 @@ export const previewStore = {
     };
   },
 
+  listContacts(phone: string) {
+    const user = ensureUser({ phone });
+    const candidateIds = new Set<string>();
+
+    state.friendRequests.forEach((item) => {
+      if (item.status !== 'ACCEPTED') {
+        return;
+      }
+      if (item.fromUserId === user.id) {
+        candidateIds.add(item.toUserId);
+      }
+      if (item.toUserId === user.id) {
+        candidateIds.add(item.fromUserId);
+      }
+    });
+
+    state.conversations
+      .filter((item) => item.type === 'DM' && item.members.includes(user.id))
+      .forEach((item) => {
+        item.members.filter((memberId) => memberId !== user.id).forEach((memberId) => candidateIds.add(memberId));
+      });
+
+    state.tags
+      .filter((item) => item.ownerUserId === user.id)
+      .forEach((item) => item.memberUserIds.forEach((memberId) => candidateIds.add(memberId)));
+
+    return [...candidateIds]
+      .filter((targetUserId) => !isBlockedByOwner(user.id, targetUserId))
+      .map((targetUserId) => mapContactSummary(user.id, targetUserId))
+      .filter((value): value is NonNullable<typeof value> => Boolean(value))
+      .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+  },
+
   listFriendRequests(phone: string) {
     const user = ensureUser({ phone });
     return state.friendRequests
@@ -792,12 +939,180 @@ export const previewStore = {
     return mapFriendRequestRow(request);
   },
 
+  sendFriendRequest(input: { phone: string; targetPhone: string; note?: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const target = getUserByPhone(input.targetPhone);
+    if (!target) {
+      throw new Error('user not found');
+    }
+    if (target.id === user.id) {
+      throw new Error('cannot add self');
+    }
+
+    const relationship = buildRelationshipState(user.id, target.id);
+    if (relationship === 'FRIEND') {
+      throw new Error('already friends');
+    }
+    if (relationship === 'PENDING_INCOMING' || relationship === 'PENDING_OUTGOING') {
+      throw new Error('friend request already pending');
+    }
+
+    const request: PreviewFriendRequest = {
+      id: `friend-${randomUUID()}`,
+      fromUserId: user.id,
+      toUserId: target.id,
+      note: input.note?.trim() || '你好，想加你为好友。',
+      status: 'PENDING',
+      createdAt: new Date().toISOString()
+    };
+    state.friendRequests.unshift(request);
+    return {
+      id: request.id,
+      name: target.nickname,
+      phone: target.phone,
+      note: request.note,
+      status: '待通过' as const,
+      createdAt: request.createdAt
+    };
+  },
+
+  getContactProfile(input: { phone: string; targetPhone: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const target = getUserByPhone(input.targetPhone);
+    if (!target) {
+      throw new Error('user not found');
+    }
+    return mapContactProfile(user.id, target.id);
+  },
+
+  removeContact(input: { phone: string; targetPhone: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const target = getUserByPhone(input.targetPhone);
+    if (!target) {
+      throw new Error('user not found');
+    }
+
+    state.friendRequests = state.friendRequests.filter(
+      (item) =>
+        !(
+          (item.fromUserId === user.id && item.toUserId === target.id) ||
+          (item.fromUserId === target.id && item.toUserId === user.id)
+        )
+    );
+
+    state.tags
+      .filter((item) => item.ownerUserId === user.id)
+      .forEach((item) => {
+        item.memberUserIds = item.memberUserIds.filter((memberId) => memberId !== target.id);
+      });
+
+    return {
+      ok: true as const,
+      status: 'REMOVED' as const
+    };
+  },
+
+  blockContact(input: { phone: string; targetPhone: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const target = getUserByPhone(input.targetPhone);
+    if (!target) {
+      throw new Error('user not found');
+    }
+
+    state.blocks = state.blocks.filter(
+      (item) => !(item.ownerUserId === user.id && item.targetUserId === target.id)
+    );
+    state.blocks.unshift({
+      id: randomUUID(),
+      ownerUserId: user.id,
+      targetUserId: target.id,
+      createdAt: new Date().toISOString()
+    });
+
+    this.removeContact(input);
+
+    return {
+      ok: true as const,
+      status: 'BLOCKED' as const
+    };
+  },
+
+  reportContact(input: { phone: string; targetPhone: string; reason: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const target = getUserByPhone(input.targetPhone);
+    if (!target) {
+      throw new Error('user not found');
+    }
+
+    const report: PreviewReport = {
+      id: randomUUID(),
+      reporterUserId: user.id,
+      targetUserId: target.id,
+      reason: input.reason.trim(),
+      status: 'OPEN',
+      createdAt: new Date().toISOString()
+    };
+    state.reports.unshift(report);
+    return {
+      id: report.id,
+      status: report.status
+    };
+  },
+
   listTags(phone: string) {
     const user = ensureUser({ phone });
     return state.tags
       .filter((item) => item.ownerUserId === user.id)
       .sort((a, b) => `${b.createdAt}`.localeCompare(`${a.createdAt}`))
       .map((item) => mapTagRow(item));
+  },
+
+  listTagMembers(input: { phone: string; tagId: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const tag = state.tags.find((item) => item.id === input.tagId && item.ownerUserId === user.id);
+    if (!tag) {
+      throw new Error('tag not found');
+    }
+    return mapTagRow(tag).members;
+  },
+
+  addTagMember(input: { phone: string; tagId: string; contactPhone: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const tag = state.tags.find((item) => item.id === input.tagId && item.ownerUserId === user.id);
+    if (!tag) {
+      throw new Error('tag not found');
+    }
+
+    const target = getUserByPhone(input.contactPhone);
+    if (!target) {
+      throw new Error('user not found');
+    }
+    if (tag.memberUserIds.includes(target.id)) {
+      throw new Error('contact already in tag');
+    }
+
+    tag.memberUserIds.push(target.id);
+    return {
+      ok: true as const
+    };
+  },
+
+  removeTagMember(input: { phone: string; tagId: string; contactPhone: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const tag = state.tags.find((item) => item.id === input.tagId && item.ownerUserId === user.id);
+    if (!tag) {
+      throw new Error('tag not found');
+    }
+
+    const target = getUserByPhone(input.contactPhone);
+    if (!target) {
+      throw new Error('user not found');
+    }
+
+    tag.memberUserIds = tag.memberUserIds.filter((memberId) => memberId !== target.id);
+    return {
+      ok: true as const
+    };
   },
 
   createTag(input: { phone: string; title: string }) {
@@ -830,10 +1145,7 @@ export const previewStore = {
         title: item.nickname,
         subtitle: `联系人 · ${item.phone}`,
         type: '联系人' as const,
-        to: `/h5/${(() => {
-          const existing = findExistingDmConversation(user.id, item.id);
-          return existing ? `chat/${existing.id}` : 'contacts/friends';
-        })()}`
+        to: `/h5/contacts/profile/${encodeURIComponent(item.phone)}`
       }));
 
     const groups = state.conversations

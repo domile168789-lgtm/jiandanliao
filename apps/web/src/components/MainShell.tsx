@@ -11,7 +11,7 @@ import DataModeNotice from './DataModeNotice';
 
 const plusMenuItems = [
   { label: '发起群聊', to: '/h5/group/new', icon: '群' },
-  { label: '添加朋友', to: '/h5/contacts/friends', icon: '友' },
+  { label: '添加朋友', to: '/h5/discover/search', icon: '友' },
   { label: '扫一扫', to: '/h5/discover/scan', icon: '扫' },
   { label: '收付款', to: '/h5/wallet', icon: '付' }
 ] as const;

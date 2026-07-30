@@ -66,6 +66,9 @@ export default function FriendsRequestsPage() {
                     <strong>{item.name}</strong>
                     <span>{item.phone}</span>
                     <p>{item.note}</p>
+                    <Link className="mini-link" to={`/h5/contacts/profile/${encodeURIComponent(item.phone)}`}>
+                      查看资料
+                    </Link>
                   </div>
                 </div>
                 <button

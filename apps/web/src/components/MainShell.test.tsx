@@ -53,7 +53,7 @@ describe('MainShell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '打开快捷菜单' }));
     expect(await screen.findByRole('link', { name: '发起群聊' })).toHaveAttribute('href', '/h5/group/new');
-    expect(screen.getByRole('link', { name: '添加朋友' })).toHaveAttribute('href', '/h5/contacts/friends');
+    expect(screen.getByRole('link', { name: '添加朋友' })).toHaveAttribute('href', '/h5/discover/search');
     expect(screen.getByRole('link', { name: '扫一扫' })).toHaveAttribute('href', '/h5/discover/scan');
     expect(screen.getByRole('link', { name: '收付款' })).toHaveAttribute('href', '/h5/wallet');
 
