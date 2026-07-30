@@ -1,0 +1,7 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Jianliao" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Compose 主题由代码层提供，这里只保证 Activity 有可用主题 -->
+        <item name="android:statusBarColor" tools:targetApi="l">?android:attr/statusBarColor</item>
+    </style>
+</resources>
+

@@ -1,0 +1,57 @@
+{
+  "name": "@jianliao/admin-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "pnpm run build:electron && concurrently -k \"vite --port 5175\" \"wait-on http://127.0.0.1:5175 && electron ./dist-electron/main.cjs\"",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json && node -e \"const fs=require('node:fs');const src='dist-electron/main.js';const dest='dist-electron/main.cjs';if(fs.existsSync(src)){fs.copyFileSync(src,dest);}\"",
+    "build": "pnpm run build:renderer && pnpm run build:electron",
+    "dist:win": "pnpm run build && electron-builder --win nsis",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^9.2.1",
+    "electron": "^37.2.6",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.6",
+    "vitest": "^3.2.4",
+    "wait-on": "^8.0.5"
+  },
+  "build": {
+    "appId": "com.jianliao.admin.desktop",
+    "productName": "JianliaoAdminDesktop",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "index.html",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

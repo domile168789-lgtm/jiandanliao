@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  phone       String   @unique
+  nickname    String
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  devices     UserDevice[]
+  credentials UserCredential?
+}
+
+model UserCredential {
+  id           String @id @default(cuid())
+  userId       String @unique
+  passwordHash String?
+  user         User   @relation(fields: [userId], references: [id])
+}
+
+model UserDevice {
+  id           String @id @default(cuid())
+  userId       String
+  platform     String
+  deviceId     String
+  refreshToken String?
+  user         User   @relation(fields: [userId], references: [id])
+  @@unique([userId, deviceId])
+}
+
+model Conversation {
+  id          String   @id @default(cuid())
+  type        String
+  title       String?
+  lastMessage String?
+  updatedAt   DateTime @updatedAt
+  messages    Message[]
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  type           String
+  status         String   @default("SENT")
+  body           Json
+  createdAt      DateTime @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+}
+
+model AdminAction {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String
+  createdAt  DateTime @default(now())
+}
+
+model MessageReceipt {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  type      String
+  createdAt DateTime @default(now())
+}

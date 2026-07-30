@@ -1,0 +1,21 @@
+{
+  "name": "jianliao-platform",
+  "private": true,
+  "packageManager": "pnpm@10.28.1",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter @jianliao/web dev",
+    "dev:admin": "pnpm --filter @jianliao/admin-desktop dev",
+    "dev:phase1-up": "bash scripts/dev/phase1-up.sh",
+    "dev:phase1-smoke": "bash scripts/dev/phase1-smoke-check.sh",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint"
+  },
+  "dependencies": {
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "vitest": "^3.2.7"
+  }
+}

@@ -1,0 +1,38 @@
+name: JianliaoIOS
+options:
+  bundleIdPrefix: com.jianliao
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+
+packages:
+  SocketIO:
+    url: https://github.com/socketio/socket.io-client-swift
+    from: 16.1.0
+
+targets:
+  JianliaoIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: JianliaoIOS
+    resources:
+      - path: JianliaoIOS/Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jianliao.ios
+        DEVELOPMENT_TEAM: ""
+        INFOPLIST_FILE: JianliaoIOS/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - package: SocketIO
+
+  JianliaoIOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: JianliaoIOSTests
+    dependencies:
+      - target: JianliaoIOS
+

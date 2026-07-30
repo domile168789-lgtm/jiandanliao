@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test_build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm -r test
+
+      - name: Build api
+        run: pnpm --filter @jianliao/api build
+
+      - name: Build ws
+        run: pnpm --filter @jianliao/ws build
+
+      - name: Build web
+        run: pnpm --filter @jianliao/web build
+
+      - name: Build admin-desktop
+        run: pnpm --filter @jianliao/admin-desktop build
