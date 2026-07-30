@@ -1,5 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import DataModeNotice from '../components/DataModeNotice';
+import { getErrorMessage } from '../api/loadable';
+import { resolveScanImage, type ScanResolveResult } from '../api/security';
 import { scanShortcuts } from './wechatSecondaryData';
 
 const scanPresets = [
@@ -50,14 +53,34 @@ function resolveScanResult(code: string) {
 
 export default function ScanPage() {
   const [code, setCode] = React.useState('');
-  const result = React.useMemo(() => resolveScanResult(code), [code]);
+  const [imageResult, setImageResult] = React.useState<ScanResolveResult | null>(null);
+  const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [uploading, setUploading] = React.useState(false);
+  const result = React.useMemo(() => imageResult || resolveScanResult(code), [code, imageResult]);
+
+  const handleScanImage = async (file: File) => {
+    setUploading(true);
+    setErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      const resolved = await resolveScanImage(file);
+      setImageResult(resolved);
+      setCode(resolved.code);
+      setNoticeMessage(`已完成图片识别：${file.name}`);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, '图片识别失败，请稍后重试'));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <section className="h5-page">
       <header className="top-bar top-bar-split">
         <div>
           <h1>扫一扫</h1>
-          <p>支持模拟识别好友码、收付款码和活动海报，继续承接到真实业务页面。</p>
+          <p>支持上传二维码图片识别，也保留手动模拟结果便于预览业务跳转。</p>
         </div>
         <Link className="mini-link" to="/h5/discover">
           返回发现
@@ -73,17 +96,37 @@ export default function ScanPage() {
             <span className="scanner-line" />
           </div>
           <strong>对准二维码 / 条形码即可识别</strong>
-          <p>Web 预览下先提供模拟识别结果，后续可继续接入摄像头与图片识别能力。</p>
+          <p>当前优先支持图片上传识别，后续可以继续补摄像头扫码能力。</p>
         </section>
+        {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
+        {noticeMessage ? <DataModeNotice message={noticeMessage} /> : null}
         <section className="section-card scan-form-card">
-          <strong>模拟扫码结果</strong>
+          <strong>图片识别与模拟扫码</strong>
+          <label className="search-box" htmlFor="scan-image-upload">
+            <span>上传二维码图片</span>
+            <input
+              id="scan-image-upload"
+              aria-label="上传二维码图片"
+              type="file"
+              accept="image/*"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                void handleScanImage(file);
+              }}
+            />
+          </label>
+          {uploading ? <p className="conversation-state">图片识别中...</p> : null}
           <div className="action-chip-row">
             {scanPresets.map((item) => (
               <button
                 key={item.code}
                 type="button"
                 className="secondary-button"
-                onClick={() => setCode(item.code)}
+                onClick={() => {
+                  setImageResult(null);
+                  setCode(item.code);
+                }}
               >
                 {item.label}
               </button>
@@ -96,7 +139,10 @@ export default function ScanPage() {
               name="scan-demo-code"
               placeholder="例如：friend:855010188001"
               value={code}
-              onChange={(event) => setCode(event.target.value)}
+              onChange={(event) => {
+                setImageResult(null);
+                setCode(event.target.value);
+              }}
             />
           </label>
           {result ? (

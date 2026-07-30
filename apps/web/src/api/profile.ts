@@ -1,4 +1,4 @@
-import { apiGet } from './client';
+import { apiGet, apiPost } from './client';
 import { withDemoFallback, type LoadableData } from './loadable';
 
 export type ProfileOverview = {
@@ -6,6 +6,7 @@ export type ProfileOverview = {
   phone: string;
   memberSince: string;
   safetyLevel: string;
+  avatarUrl?: string | null;
 };
 
 export type WalletSummary = {
@@ -45,11 +46,13 @@ export type ActivityPreview = {
 
 const today = new Date().toISOString();
 
-const fallbackProfile: ProfileOverview = {
+let fallbackProfile: ProfileOverview = {
   displayName: '柬单聊演示账号',
   phone: '855-010-888-000',
   memberSince: '2026-07-01',
-  safetyLevel: '标准保护'
+  safetyLevel: '标准保护',
+  avatarUrl:
+    'https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=professional%20messaging%20app%20user%20avatar%2C%20friendly%20asian%20business%20portrait%2C%20clean%20background%2C%20modern%20product%20style&image_size=square_hd'
 };
 
 const fallbackWallet: WalletSummary = {
@@ -116,7 +119,11 @@ const asProfileOverview = (value: unknown): ProfileOverview => {
     memberSince:
       typeof value.memberSince === 'string' && value.memberSince ? value.memberSince : fallbackProfile.memberSince,
     safetyLevel:
-      typeof value.safetyLevel === 'string' && value.safetyLevel ? value.safetyLevel : fallbackProfile.safetyLevel
+      typeof value.safetyLevel === 'string' && value.safetyLevel ? value.safetyLevel : fallbackProfile.safetyLevel,
+    avatarUrl:
+      typeof value.avatarUrl === 'string' || value.avatarUrl === null
+        ? (value.avatarUrl as string | null)
+        : fallbackProfile.avatarUrl
   };
 };
 
@@ -213,6 +220,11 @@ export function getFallbackActivityFeed() {
 const getProfileOverview = async (fetcher: typeof fetch = fetch) =>
   asProfileOverview(await apiGet<unknown>('/api/profile/summary', fetcher));
 
+const postProfileOverview = async (
+  input: { displayName?: string; avatarUrl?: string },
+  fetcher: typeof fetch = fetch
+) => asProfileOverview(await apiPost<unknown>('/api/profile', input, fetcher));
+
 const getWalletSummary = async (fetcher: typeof fetch = fetch) =>
   asWalletSummary(await apiGet<unknown>('/api/profile/wallet', fetcher));
 
@@ -234,6 +246,24 @@ export async function loadProfileOverview(fetcher: typeof fetch = fetch): Promis
     fallbackProfile,
     '个人资料接口暂不可用，当前展示演示资料。'
   );
+}
+
+export async function updateProfileOverview(
+  input: { displayName?: string; avatarUrl?: string },
+  fetcher: typeof fetch = fetch
+): Promise<ProfileOverview> {
+  try {
+    const profile = await postProfileOverview(input, fetcher);
+    fallbackProfile = profile;
+    return profile;
+  } catch {
+    fallbackProfile = {
+      ...fallbackProfile,
+      displayName: input.displayName?.trim() || fallbackProfile.displayName,
+      avatarUrl: input.avatarUrl === undefined ? fallbackProfile.avatarUrl : input.avatarUrl || null
+    };
+    return fallbackProfile;
+  }
 }
 
 export async function loadWalletSummary(fetcher: typeof fetch = fetch): Promise<LoadableData<WalletSummary>> {

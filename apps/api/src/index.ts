@@ -11,6 +11,7 @@ import { groupBotRoutes } from './modules/group-bot/group-bot.routes.js';
 import { reportRoutes } from './modules/reports/report.routes.js';
 import { profileRoutes } from './modules/profile/profile.routes.js';
 import { contactsRoutes } from './modules/contacts/contacts.routes.js';
+import { securityRoutes } from './modules/security/security.routes.js';
 
 const app = Fastify({ logger: true });
 
@@ -31,6 +32,7 @@ await app.register(publicRoutes, { prefix: '/api' });
 await app.register(groupBotRoutes, { prefix: '/api' });
 await app.register(profileRoutes, { prefix: '/api' });
 await app.register(contactsRoutes, { prefix: '/api' });
+await app.register(securityRoutes, { prefix: '/api' });
 
 const port = Number(process.env.PORT || 3001);
 await app.listen({ port, host: '0.0.0.0' });

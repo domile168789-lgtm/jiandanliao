@@ -44,6 +44,52 @@ describe('profileRoutes', () => {
     await app.close();
   });
 
+  it('updates profile nickname for authenticated user', async () => {
+    executeMock.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (sql.includes('UPDATE users SET nickname')) {
+        expect(params).toEqual(['新的昵称', expect.any(Date), '85510000001']);
+        return [[]];
+      }
+
+      if (sql.includes('FROM users')) {
+        return [
+          [
+            {
+              id: 'u1',
+              phone: '85510000001',
+              nickname: '新的昵称',
+              status: 'ACTIVE',
+              createdAt: '2026-07-01 08:00:00'
+            }
+          ]
+        ];
+      }
+
+      return [[]];
+    });
+
+    const app = Fastify();
+    app.addHook('preHandler', async (request) => {
+      request.user = { phone: '85510000001', deviceId: 'ios-1' };
+    });
+    await app.register(profileRoutes, { prefix: '/api' });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/profile',
+      payload: { displayName: '新的昵称' }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      displayName: '新的昵称',
+      phone: '85510000001',
+      memberSince: '2026-07-01'
+    });
+
+    await app.close();
+  });
+
   it('returns lightweight readonly profile payloads for authenticated user', async () => {
     executeMock.mockImplementation(async (sql: string) => {
       if (sql.includes('FROM users')) {
@@ -88,7 +134,8 @@ describe('profileRoutes', () => {
       displayName: '演示账号',
       phone: '85510000001',
       memberSince: '2026-07-01',
-      safetyLevel: '标准保护'
+      safetyLevel: '标准保护',
+      avatarUrl: expect.any(String)
     });
 
     const walletRes = await app.inject({ method: 'GET', url: '/api/profile/wallet' });

@@ -5,6 +5,8 @@ const unauthorized = { code: 'UNAUTHORIZED' } as const;
 
 export async function profileRoutes(app: FastifyInstance) {
   const service = new ProfileService();
+  const isBadRequest = (error: unknown) =>
+    error instanceof Error && ['no profile fields'].includes(error.message);
 
   const resolvePhone = (phone?: string) => {
     if (!phone) {
@@ -52,4 +54,24 @@ export async function profileRoutes(app: FastifyInstance) {
   app.get('/profile/system-notices', async (request, reply) =>
     handleProfileRequest(resolvePhone(request.user?.phone), reply, (phone) => service.getSystemNotices(phone))
   );
+
+  app.post('/profile', async (request, reply) => {
+    const phone = resolvePhone(request.user?.phone);
+    const body = request.body as { displayName?: string; avatarUrl?: string };
+
+    try {
+      return await handleProfileRequest(phone, reply, (resolvedPhone) =>
+        service.updateOverview({
+          phone: resolvedPhone,
+          displayName: body.displayName,
+          avatarUrl: body.avatarUrl
+        })
+      );
+    } catch (error) {
+      if (isBadRequest(error)) {
+        return reply.code(400).send({ code: 'BAD_REQUEST', message: (error as Error).message });
+      }
+      throw error;
+    }
+  });
 }

@@ -16,6 +16,8 @@ type ActivityNoticeRow = {
 };
 
 const fallbackCreatedAt = '2026-07-01T00:00:00.000Z';
+const fallbackAvatarUrl = 'https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=professional%20messaging%20app%20user%20avatar%2C%20friendly%20asian%20business%20portrait%2C%20clean%20background%2C%20modern%20product%20style&image_size=square_hd';
+const profileOverrides = new Map<string, { displayName?: string; avatarUrl?: string | null }>();
 
 const getPhoneTail = (phone: string) => {
   const digits = phone.replace(/\D/g, '');
@@ -49,11 +51,13 @@ const clampMoney = (value: number) => Number(value.toFixed(2));
 
 export class ProfileService {
   private async getProfileRecord(phone: string): Promise<ProfileRecord> {
+    const override = profileOverrides.get(phone);
+
     if (!process.env.DATABASE_URL) {
       return {
         id: `mock-${phone}`,
         phone,
-        nickname: `用户${getPhoneTail(phone)}`,
+        nickname: override?.displayName || `用户${getPhoneTail(phone)}`,
         status: 'ACTIVE',
         createdAt: fallbackCreatedAt
       };
@@ -78,12 +82,53 @@ export class ProfileService {
 
   async getSummary(phone: string) {
     const profile = await this.getProfileRecord(phone);
+    const override = profileOverrides.get(phone);
     return {
-      displayName: profile.nickname || `用户${getPhoneTail(phone)}`,
+      displayName: override?.displayName || profile.nickname || `用户${getPhoneTail(phone)}`,
       phone: profile.phone,
       memberSince: toDateOnly(profile.createdAt),
-      safetyLevel: profile.status === 'BANNED' ? '受限保护' : '标准保护'
+      safetyLevel: profile.status === 'BANNED' ? '受限保护' : '标准保护',
+      avatarUrl: override?.avatarUrl === undefined ? fallbackAvatarUrl : override.avatarUrl
     };
+  }
+
+  async updateOverview(input: { phone: string; displayName?: string; avatarUrl?: string }) {
+    const displayName = input.displayName?.trim();
+    const avatarUrl = input.avatarUrl?.trim();
+
+    if (!displayName && avatarUrl === undefined) {
+      throw new Error('no profile fields');
+    }
+
+    if (!process.env.DATABASE_URL) {
+      const current = profileOverrides.get(input.phone) || {};
+      profileOverrides.set(input.phone, {
+        displayName: displayName || current.displayName,
+        avatarUrl: avatarUrl === undefined ? current.avatarUrl : avatarUrl || null
+      });
+      return this.getSummary(input.phone);
+    }
+
+    await this.getProfileRecord(input.phone);
+
+    if (displayName) {
+      const db = getDb();
+      await db.execute(`UPDATE users SET nickname = ?, updated_at = ? WHERE phone = ?`, [
+        displayName,
+        new Date(),
+        input.phone
+      ]);
+    }
+
+    if (avatarUrl !== undefined) {
+      const current = profileOverrides.get(input.phone) || {};
+      profileOverrides.set(input.phone, {
+        displayName: displayName || current.displayName,
+        avatarUrl: avatarUrl || null
+      });
+    }
+
+    return this.getSummary(input.phone);
   }
 
   async getWallet(phone: string) {

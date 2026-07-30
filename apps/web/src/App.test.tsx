@@ -46,16 +46,174 @@ const createGroupMembers = () => [
   }
 ] as const;
 
+const resolveScanPayload = (payload: string) => {
+  const normalized = payload.trim().toLowerCase();
+  const matchedFriend = normalized.match(/friend:([0-9]+)/);
+
+  if (matchedFriend) {
+    return {
+      code: `friend:${matchedFriend[1]}`,
+      title: '识别到好友二维码',
+      description: '当前图片已解析为好友二维码，可前往新的朋友页继续处理。',
+      to: '/h5/contacts/friends',
+      actionLabel: '去添加朋友',
+      source: 'image'
+    };
+  }
+
+  if (normalized.includes('wallet:')) {
+    return {
+      code: 'wallet:collect',
+      title: '识别到收付款码',
+      description: '当前图片已解析为钱包入口，可继续查看余额、账单和收付款。',
+      to: '/h5/wallet',
+      actionLabel: '前往钱包',
+      source: 'image'
+    };
+  }
+
+  if (normalized.includes('poster:')) {
+    return {
+      code: 'poster:new-user-campaign',
+      title: '识别到活动海报',
+      description: '当前图片已解析为活动素材，可继续前往看一看查看推荐内容。',
+      to: '/h5/discover/channels',
+      actionLabel: '查看活动内容',
+      source: 'image'
+    };
+  }
+
+  return {
+    code: payload.trim() || 'demo:search',
+    title: '识别到普通内容',
+    description: '当前图片已完成解析，可继续前往搜一搜查看关联内容。',
+    to: '/h5/discover/search',
+    actionLabel: '去搜一搜',
+    source: 'image'
+  };
+};
+
 describe('App route entry', () => {
   beforeEach(() => {
     window.localStorage.clear();
     cleanup();
     let groupMembers = createGroupMembers().map((item) => ({ ...item }));
+    let profileSummary = {
+      displayName: '演示账号',
+      phone: '855010100000',
+      memberSince: '2026-07-01',
+      safetyLevel: '标准保护',
+      avatarUrl: 'https://assets.jianliao.local/avatar-demo.png'
+    };
+    let securityDevices = [
+      {
+        deviceId: 'web-preview-device',
+        platform: 'H5',
+        lastActiveAt: '2026-07-30T10:00:00.000Z',
+        isCurrent: true,
+        status: '当前设备'
+      },
+      {
+        deviceId: 'ios-1',
+        platform: 'IOS',
+        lastActiveAt: '2026-07-29T20:00:00.000Z',
+        isCurrent: false,
+        status: '已登录'
+      }
+    ];
+    let securityBlacklist = [
+      {
+        phone: '855010188003',
+        name: '风控专员 May',
+        blockedAt: '2026-07-30T08:00:00.000Z',
+        reason: '已关闭临时通知同步'
+      }
+    ];
+    let privacySettings = {
+      discoverableByPhone: true,
+      requireFriendRequestNote: true,
+      allowGroupInvite: true,
+      showReadReceipts: false
+    };
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         const method = init?.method || 'GET';
+        if (url.endsWith('/api/profile/summary') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => profileSummary
+          });
+        }
+
+        if (url.endsWith('/api/profile') && method === 'POST') {
+          const payload = JSON.parse(String(init?.body || '{}')) as { displayName?: string; avatarUrl?: string };
+          profileSummary = {
+            ...profileSummary,
+            displayName: payload.displayName || profileSummary.displayName,
+            avatarUrl: payload.avatarUrl === undefined ? profileSummary.avatarUrl : payload.avatarUrl || null
+          };
+          return Promise.resolve({
+            ok: true,
+            json: async () => profileSummary
+          });
+        }
+
+        if (url.endsWith('/api/security/devices') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => securityDevices
+          });
+        }
+
+        if (url.endsWith('/api/security/blacklist') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => securityBlacklist
+          });
+        }
+
+        if (url.endsWith('/api/security/blacklist/remove') && method === 'POST') {
+          const payload = JSON.parse(String(init?.body || '{}')) as { targetPhone?: string };
+          securityBlacklist = securityBlacklist.filter((item) => item.phone !== payload.targetPhone);
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              ok: true,
+              targetPhone: payload.targetPhone || '',
+              remainingCount: securityBlacklist.length
+            })
+          });
+        }
+
+        if (url.endsWith('/api/security/privacy') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => privacySettings
+          });
+        }
+
+        if (url.endsWith('/api/security/privacy') && method === 'POST') {
+          const payload = JSON.parse(String(init?.body || '{}')) as Partial<typeof privacySettings>;
+          privacySettings = {
+            ...privacySettings,
+            ...payload
+          };
+          return Promise.resolve({
+            ok: true,
+            json: async () => privacySettings
+          });
+        }
+
+        if (url.endsWith('/api/security/scan/resolve') && method === 'POST') {
+          const payload = JSON.parse(String(init?.body || '{}')) as { textContent?: string; fileName?: string };
+          return Promise.resolve({
+            ok: true,
+            json: async () => resolveScanPayload(payload.textContent || payload.fileName || '')
+          });
+        }
+
         if (url.endsWith('/api/contacts') && method === 'GET') {
           return Promise.resolve({
             ok: true,
@@ -880,6 +1038,17 @@ describe('App route entry', () => {
     expect(screen.getByRole('link', { name: '前往钱包' })).toHaveAttribute('href', '/h5/wallet');
   });
 
+  it('uploads scan image and resolves result', async () => {
+    renderAt('/h5/discover/scan', { token: 'demo-token' });
+
+    const file = new File(['wallet:collect'], 'wallet:collect.png', { type: 'image/png' });
+    const input = await screen.findByLabelText('上传二维码图片');
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByText('识别到收付款码')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '前往钱包' })).toHaveAttribute('href', '/h5/wallet');
+  });
+
   it('renders wechat-style discover rows', async () => {
     renderAt('/h5/discover', { token: 'demo-token' });
 
@@ -979,6 +1148,37 @@ describe('App route entry', () => {
     cleanup();
     renderAt('/h5/security', { token: 'demo-token' });
     expect(await screen.findByRole('heading', { level: 1, name: '安全中心' })).toBeInTheDocument();
+  });
+
+  it('updates profile nickname from profile page', async () => {
+    renderAt('/h5/profile', { token: 'demo-token' });
+
+    fireEvent.change(await screen.findByLabelText('昵称'), {
+      target: { value: '新的昵称' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存资料' }));
+
+    expect(await screen.findByText('资料已保存')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('新的昵称')).toBeInTheDocument();
+  });
+
+  it('loads security settings and removes blacklist contact', async () => {
+    renderAt('/h5/security', { token: 'demo-token' });
+
+    expect(await screen.findByText(/web-preview-device/)).toBeInTheDocument();
+    expect(screen.getByText('风控专员 May')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '移出 风控专员 May' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('风控专员 May')).not.toBeInTheDocument();
+    });
+  });
+
+  it('loads settings summary from security api', async () => {
+    renderAt('/h5/settings', { token: 'demo-token' });
+
+    expect(await screen.findByText('已登录设备 2 台 · 黑名单 1 人')).toBeInTheDocument();
+    expect(screen.getByText('允许手机号搜索')).toBeInTheDocument();
   });
 
   it('maps /mobile to mobile branding and /PC to pc branding', async () => {
