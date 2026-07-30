@@ -1,5 +1,23 @@
 # 柬单聊最终验收记录
 
+## 最新全量回归（2026-07-30 14:43:13 UTC）
+
+- 回归基线：`99666e5f8a73a7a9037cae0431469d8bc6794558`（`main`，已执行 `git fetch origin main --prune`；当前工作树相对 `origin/main` 无落后提交，仅存在本地领先提交）
+- 验收结论：本轮 `api` / `web` 全量 `test` 与 `build` 全部通过，无需为本次回归额外修复代码
+- API 测试：执行 `pnpm --filter @jianliao/api test`，`19` 个测试文件、`91` 个测试全部通过
+- API 构建：执行 `pnpm --filter @jianliao/api build`，`tsc -p tsconfig.json` 成功完成
+- Web 测试：执行 `pnpm --filter @jianliao/web test`，`2` 个测试文件、`36` 个测试全部通过
+- Web 构建：执行 `pnpm --filter @jianliao/web build` 成功，产物输出为 `dist/index.html`、`dist/assets/index-p1sArRti.css`、`dist/assets/index-Dt5t76fE.js`
+- 构建备注：Vite 在打包 `react-router` 依赖时提示 `"use client"` 指令被忽略，但未阻断构建，最终构建状态为成功
+
+## 本次回归命令清单
+
+- `git fetch origin main --prune`
+- `pnpm --filter @jianliao/api test`
+- `pnpm --filter @jianliao/api build`
+- `pnpm --filter @jianliao/web test`
+- `pnpm --filter @jianliao/web build`
+
 ## 当前结论
 
 - 共享后端、管理后台、Web/H5 已完成代码层生产化收口
