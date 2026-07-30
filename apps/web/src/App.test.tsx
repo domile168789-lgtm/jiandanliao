@@ -31,6 +31,100 @@ describe('App route entry', () => {
       vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         const method = init?.method || 'GET';
+        if (url.includes('/api/contacts/friend-requests') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              {
+                id: 'friend-1',
+                name: '阿杰商务',
+                phone: '855010188001',
+                note: '通过渠道会认识你，想拉你进合作对接群。',
+                status: '待通过'
+              },
+              {
+                id: 'friend-2',
+                name: '风控专员 May',
+                phone: '855010188003',
+                note: '你已通过企业认证，可以直接同步安全设置提醒。',
+                status: '已添加'
+              }
+            ]
+          });
+        }
+
+        if (url.includes('/api/contacts/friend-requests/') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              id: 'friend-1',
+              name: '阿杰商务',
+              phone: '855010188001',
+              note: '通过渠道会认识你，想拉你进合作对接群。',
+              status: '已添加'
+            })
+          });
+        }
+
+        if (url.includes('/api/contacts/tags') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              {
+                id: 'tag-1',
+                title: '渠道合作',
+                count: 3,
+                members: ['商务对接', '渠道伙伴', '运营小晴'],
+                note: '用于日常合作、活动排期和投放沟通。'
+              },
+              {
+                id: 'tag-2',
+                title: '安全与风控',
+                count: 2,
+                members: ['安全专员', '风控专员 May'],
+                note: '统一查看账号、设备、风控和告警相关联系人。'
+              }
+            ]
+          });
+        }
+
+        if (url.includes('/api/contacts/tags') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              id: 'tag-created',
+              title: '重点跟进',
+              count: 0,
+              members: [],
+              note: '新建标签，后续可继续补充成员。'
+            })
+          });
+        }
+
+        if (url.includes('/api/search')) {
+          const keyword = new URL(url, 'http://localhost').searchParams.get('keyword') || '';
+          const rows = [
+            {
+              id: 'search-1',
+              title: '商务对接',
+              subtitle: '联系人 · 855010100002',
+              type: '联系人',
+              to: '/h5/contacts/friends'
+            },
+            {
+              id: 'search-2',
+              title: '钱包',
+              subtitle: '服务 · 余额、收付款和账单',
+              type: '服务',
+              to: '/h5/wallet'
+            }
+          ];
+          return Promise.resolve({
+            ok: true,
+            json: async () => rows.filter((item) => `${item.title} ${item.subtitle}`.includes(keyword))
+          });
+        }
+
         if (url.includes('/api/conversations/group') && method === 'POST') {
           return Promise.resolve({
             ok: true,
@@ -195,13 +289,13 @@ describe('App route entry', () => {
     }
   });
 
-  it('renders actionable friend requests page', async () => {
+  it('loads and accepts friend requests from api', async () => {
     renderAt('/h5/contacts/friends', { token: 'demo-token' });
 
     expect((await screen.findAllByRole('button', { name: '通过' })).length).toBeGreaterThan(0);
     expect(screen.getByText('手机号添加入口')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: '通过' })[0]);
-    expect(screen.getAllByRole('button', { name: '已通过' }).length).toBeGreaterThan(0);
+    expect((await screen.findAllByRole('button', { name: '已通过' })).length).toBeGreaterThan(0);
   });
 
   it('renders wechat-style contacts entry rows', async () => {
@@ -216,7 +310,7 @@ describe('App route entry', () => {
     );
   });
 
-  it('creates and filters tags locally', async () => {
+  it('loads, filters and creates tags from api', async () => {
     renderAt('/h5/contacts/tags', { token: 'demo-token' });
 
     fireEvent.change(await screen.findByLabelText('搜索标签或联系人'), {
@@ -232,7 +326,7 @@ describe('App route entry', () => {
     fireEvent.change(screen.getByLabelText('搜索标签或联系人'), {
       target: { value: '' }
     });
-    expect(screen.getByText('重点跟进')).toBeInTheDocument();
+    expect(await screen.findByText('重点跟进')).toBeInTheDocument();
   });
 
   it('opens the discover service pages', async () => {
@@ -263,13 +357,13 @@ describe('App route entry', () => {
     expect(screen.getAllByRole('button', { name: /赞/ })[0]).toHaveTextContent('1 赞');
   });
 
-  it('filters search hub results', async () => {
+  it('loads filtered search results from api', async () => {
     renderAt('/h5/discover/search', { token: 'demo-token' });
 
     fireEvent.change(await screen.findByLabelText('搜索联系人、群聊、服务或内容'), {
       target: { value: '钱包' }
     });
-    expect(screen.getByRole('link', { name: /钱包/ })).toHaveAttribute('href', '/h5/wallet');
+    expect(await screen.findByRole('link', { name: /钱包/ })).toHaveAttribute('href', '/h5/wallet');
     expect(screen.queryByRole('link', { name: /商务对接/ })).not.toBeInTheDocument();
   });
 

@@ -1,16 +1,38 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { searchEntries } from './wechatSecondaryData';
+import { searchHub, type SearchEntryRow } from '../api/contacts';
+import { getErrorMessage } from '../api/loadable';
 
 export default function SearchHubPage() {
   const [query, setQuery] = React.useState('');
+  const [results, setResults] = React.useState<SearchEntryRow[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  const results = React.useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return searchEntries;
-    return searchEntries.filter((item) => {
-      return `${item.title} ${item.subtitle} ${item.type}`.toLowerCase().includes(keyword);
-    });
+  React.useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    void searchHub(query)
+      .then((data) => {
+        if (cancelled) return;
+        setResults(data);
+        setErrorMessage(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setErrorMessage(getErrorMessage(error, '搜索失败，请稍后重试'));
+        setResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [query]);
 
   return (
@@ -35,6 +57,8 @@ export default function SearchHubPage() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
+        {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
+        {loading ? <p className="conversation-state">搜索中...</p> : null}
         <section className="stack-panel" aria-label="搜索结果">
           {results.map((item) => (
             <Link key={item.id} className="detail-row-link" to={item.to}>
@@ -47,7 +71,7 @@ export default function SearchHubPage() {
               </article>
             </Link>
           ))}
-          {!results.length ? (
+          {!loading && !results.length ? (
             <article className="detail-row-card">
               <div className="detail-copy">
                 <strong>没有找到相关结果</strong>

@@ -21,6 +21,10 @@
   - 预览模式下即使鉴权失效，消息页也会自动回落到本地 IM 演示会话，不再直接停留在登录失效提示
   - 新的朋友、群聊、标签、公众号、朋友圈、扫一扫、看一看、搜一搜、服务、收藏、卡包、表情等二级页已补成可浏览页面，并提供列表、筛选或本地交互
   - 标签页已支持本地搜索与新建标签；朋友圈页已支持发布动态、点赞和评论计数；扫一扫页已支持模拟识别好友码、收付款码和活动海报码
+  - 新的朋友、标签、搜一搜三页已从本地静态数据切换到真实 H5 API，前端不再直接依赖演示数组
+- 后端：
+  - 新增 `friends / tags / search` 真实接口，preview store 已支持好友请求、标签持久化与搜索结果返回
+  - 已补 `friend_requests`、`contact_tags`、`contact_tag_members` 初始化表结构与 Prisma schema 声明
 - Android：
   - 我的/发现相关页统一加载、错误、空态、来源提示
   - 会话列表、聊天页、发送后刷新、自动 READ 回执、预览会话标题映射已对齐 IM 主链路
@@ -37,6 +41,7 @@
 
 - `pnpm --filter @jianliao/api test -- admin.routes.test.ts receipt.routes.test.ts`
 - `pnpm --filter @jianliao/api test -- conversation.routes.test.ts`
+- `pnpm --filter @jianliao/api test -- --runInBand`
 - `pnpm --filter @jianliao/web test`
 - `pnpm --filter @jianliao/web build`
 - 浏览器实测 `http://localhost:4174/h5/messages?preview=demo`

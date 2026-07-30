@@ -1,11 +1,39 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { contactTags } from './wechatSecondaryData';
+import { createContactTag, loadContactTags, type ContactTagRow } from '../api/contacts';
+import { getErrorMessage } from '../api/loadable';
 
 export default function TagsPage() {
   const [query, setQuery] = React.useState('');
   const [newTagTitle, setNewTagTitle] = React.useState('');
-  const [tags, setTags] = React.useState(contactTags);
+  const [tags, setTags] = React.useState<ContactTagRow[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    void loadContactTags()
+      .then((data) => {
+        if (cancelled) return;
+        setTags(data);
+        setErrorMessage(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setErrorMessage(getErrorMessage(error, '标签加载失败，请稍后重试'));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredTags = React.useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -29,8 +57,9 @@ export default function TagsPage() {
       <div className="placeholder-list detail-page">
         <section className="section-card section-card-muted">
           <strong>标签同步说明</strong>
-          <p>当前页面已支持本地新增与筛选，后续可继续接入真实批量管理能力。</p>
+          <p>当前页面已改为真实接口驱动，可继续在后端扩展成员管理与批量操作。</p>
         </section>
+        {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
         <section className="section-card tag-editor-card">
           <label className="search-box" htmlFor="tag-search-keyword">
             <span>搜索标签或联系人</span>
@@ -52,26 +81,28 @@ export default function TagsPage() {
             <button
               type="button"
               className="primary-button is-small"
-              onClick={() => {
+              disabled={submitting || !newTagTitle.trim()}
+              onClick={async () => {
                 const title = newTagTitle.trim();
                 if (!title) return;
-                setTags((current) => [
-                  {
-                    id: `tag-local-${Date.now()}`,
-                    title,
-                    count: 0,
-                    members: [],
-                    note: '新建标签，后续可继续补充成员。'
-                  },
-                  ...current
-                ]);
-                setNewTagTitle('');
+                setSubmitting(true);
+                try {
+                  const created = await createContactTag(title);
+                  setTags((current) => [created, ...current]);
+                  setNewTagTitle('');
+                  setErrorMessage(null);
+                } catch (error) {
+                  setErrorMessage(getErrorMessage(error, '新建标签失败，请稍后重试'));
+                } finally {
+                  setSubmitting(false);
+                }
               }}
             >
-              新建标签
+              {submitting ? '创建中...' : '新建标签'}
             </button>
           </div>
         </section>
+        {loading ? <p className="conversation-state">标签加载中...</p> : null}
         <section className="tag-grid" aria-label="联系人标签列表">
           {filteredTags.map((item) => (
             <article key={item.id} className="tag-card">

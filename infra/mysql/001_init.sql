@@ -24,6 +24,44 @@ CREATE TABLE IF NOT EXISTS user_devices (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS friend_requests (
+  id VARCHAR(64) PRIMARY KEY,
+  from_user_id VARCHAR(64) NOT NULL,
+  to_user_id VARCHAR(64) NOT NULL,
+  note VARCHAR(255) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_friend_requests_target_created_at
+  ON friend_requests (to_user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS contact_tags (
+  id VARCHAR(64) PRIMARY KEY,
+  owner_user_id VARCHAR(64) NOT NULL,
+  title VARCHAR(64) NOT NULL,
+  note VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_contact_tags_owner_created_at
+  ON contact_tags (owner_user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS contact_tag_members (
+  id VARCHAR(64) PRIMARY KEY,
+  tag_id VARCHAR(64) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
+  created_at DATETIME NOT NULL,
+  UNIQUE KEY uniq_contact_tag_member (tag_id, user_id),
+  FOREIGN KEY (tag_id) REFERENCES contact_tags(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS conversations (
   id VARCHAR(64) PRIMARY KEY,
   type VARCHAR(16) NOT NULL,

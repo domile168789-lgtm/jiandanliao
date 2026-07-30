@@ -39,11 +39,31 @@ type PreviewReceipt = {
   createdAt: string;
 };
 
+type PreviewFriendRequest = {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  note: string;
+  status: 'PENDING' | 'ACCEPTED';
+  createdAt: string;
+};
+
+type PreviewTag = {
+  id: string;
+  ownerUserId: string;
+  title: string;
+  note: string;
+  memberUserIds: string[];
+  createdAt: string;
+};
+
 type PreviewStoreState = {
   users: PreviewUser[];
   conversations: PreviewConversation[];
   messages: Record<string, PreviewMessage[]>;
   receipts: PreviewReceipt[];
+  friendRequests: PreviewFriendRequest[];
+  tags: PreviewTag[];
 };
 
 const buildIso = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).toISOString();
@@ -78,6 +98,30 @@ const users: PreviewUser[] = [
     phone: '855010100004',
     password: 'demo123456',
     nickname: '安全专员',
+    status: 'ACTIVE',
+    devices: {}
+  },
+  {
+    id: 'user-demo-5',
+    phone: '855010188001',
+    password: 'demo123456',
+    nickname: '阿杰商务',
+    status: 'ACTIVE',
+    devices: {}
+  },
+  {
+    id: 'user-demo-6',
+    phone: '855010188002',
+    password: 'demo123456',
+    nickname: '运营小晴',
+    status: 'ACTIVE',
+    devices: {}
+  },
+  {
+    id: 'user-demo-7',
+    phone: '855010188003',
+    password: 'demo123456',
+    nickname: '风控专员 May',
     status: 'ACTIVE',
     devices: {}
   }
@@ -202,12 +246,72 @@ const seedMessages: Record<string, PreviewMessage[]> = {
   ]
 };
 
-const state: PreviewStoreState = {
-  users,
-  conversations: seedConversations,
-  messages: seedMessages,
-  receipts: []
-};
+const seedFriendRequests: PreviewFriendRequest[] = [
+  {
+    id: 'friend-1',
+    fromUserId: 'user-demo-5',
+    toUserId: 'user-demo-1',
+    note: '通过渠道会认识你，想拉你进合作对接群。',
+    status: 'PENDING',
+    createdAt: buildIso(50)
+  },
+  {
+    id: 'friend-2',
+    fromUserId: 'user-demo-6',
+    toUserId: 'user-demo-1',
+    note: '备注：活动复盘资料已经整理好，方便随时沟通。',
+    status: 'PENDING',
+    createdAt: buildIso(42)
+  },
+  {
+    id: 'friend-3',
+    fromUserId: 'user-demo-7',
+    toUserId: 'user-demo-1',
+    note: '你已通过企业认证，可以直接同步安全设置提醒。',
+    status: 'ACCEPTED',
+    createdAt: buildIso(80)
+  }
+];
+
+const seedTags: PreviewTag[] = [
+  {
+    id: 'tag-1',
+    ownerUserId: 'user-demo-1',
+    title: '渠道合作',
+    note: '用于日常合作、活动排期和投放沟通。',
+    memberUserIds: ['user-demo-2', 'user-demo-3', 'user-demo-6'],
+    createdAt: buildIso(120)
+  },
+  {
+    id: 'tag-2',
+    ownerUserId: 'user-demo-1',
+    title: '安全与风控',
+    note: '统一查看账号、设备、风控和告警相关联系人。',
+    memberUserIds: ['user-demo-4', 'user-demo-7'],
+    createdAt: buildIso(110)
+  },
+  {
+    id: 'tag-3',
+    ownerUserId: 'user-demo-1',
+    title: '核心客户',
+    note: '用于重点客户跟进和高优先事项处理。',
+    memberUserIds: ['user-demo-2', 'user-demo-3', 'user-demo-5'],
+    createdAt: buildIso(100)
+  }
+];
+
+const createInitialState = (): PreviewStoreState => ({
+  users: users.map((item) => ({ ...item, devices: { ...item.devices } })),
+  conversations: seedConversations.map((item) => ({ ...item, members: [...item.members] })),
+  messages: Object.fromEntries(
+    Object.entries(seedMessages).map(([key, value]) => [key, value.map((item) => ({ ...item, body: { ...item.body } }))])
+  ),
+  receipts: [],
+  friendRequests: seedFriendRequests.map((item) => ({ ...item })),
+  tags: seedTags.map((item) => ({ ...item, memberUserIds: [...item.memberUserIds] }))
+});
+
+const state: PreviewStoreState = createInitialState();
 
 const sortConversations = (rows: PreviewConversation[]) =>
   rows.sort((a, b) => `${b.updatedAt}`.localeCompare(`${a.updatedAt}`));
@@ -217,6 +321,47 @@ const normalizePhone = (phone: string) => phone.trim();
 const getUserByPhone = (phone: string) => state.users.find((item) => item.phone === normalizePhone(phone));
 
 const getUserById = (userId: string) => state.users.find((item) => item.id === userId);
+
+const previewServiceEntries = [
+  {
+    id: 'service-system',
+    title: '系统通知',
+    subtitle: '服务 · 公告与风控统一入口',
+    type: '服务' as const,
+    to: '/h5/system-notice'
+  },
+  {
+    id: 'service-wallet',
+    title: '钱包',
+    subtitle: '服务 · 余额、收付款和账单',
+    type: '服务' as const,
+    to: '/h5/wallet'
+  },
+  {
+    id: 'service-agent',
+    title: '代理中心',
+    subtitle: '服务 · 查看团队与等级',
+    type: '服务' as const,
+    to: '/h5/agent'
+  }
+];
+
+const previewContentEntries = [
+  {
+    id: 'content-1',
+    title: '高转化私域触达模板',
+    subtitle: '内容 · 看一看频道推荐',
+    type: '内容' as const,
+    to: '/h5/discover/channels'
+  },
+  {
+    id: 'content-2',
+    title: '新人活动复盘',
+    subtitle: '内容 · 朋友圈与活动动态',
+    type: '内容' as const,
+    to: '/h5/discover/moments'
+  }
+];
 
 const ensureUser = (input: { phone: string; password?: string; nickname?: string }) => {
   const existing = getUserByPhone(input.phone);
@@ -233,6 +378,29 @@ const ensureUser = (input: { phone: string; password?: string; nickname?: string
   state.users.push(created);
   return created;
 };
+
+const mapFriendRequestRow = (request: PreviewFriendRequest) => {
+  const fromUser = getUserById(request.fromUserId);
+  return {
+    id: request.id,
+    name: fromUser?.nickname || '未知联系人',
+    phone: fromUser?.phone || '--',
+    note: request.note,
+    status: request.status === 'ACCEPTED' ? ('已添加' as const) : ('待通过' as const),
+    createdAt: request.createdAt
+  };
+};
+
+const mapTagRow = (tag: PreviewTag) => ({
+  id: tag.id,
+  title: tag.title,
+  count: tag.memberUserIds.length,
+  members: tag.memberUserIds
+    .map((userId) => getUserById(userId)?.nickname)
+    .filter((value): value is string => Boolean(value)),
+  note: tag.note,
+  createdAt: tag.createdAt
+});
 
 const previewMessageText = (message: PreviewMessage) => {
   if (typeof message.body.text === 'string' && message.body.text.trim()) return message.body.text.trim();
@@ -261,6 +429,15 @@ const getDirectPeerTitle = (members: string[], currentUserId: string) => {
   const peer = members.find((memberId) => memberId !== currentUserId);
   return getUserById(peer || '')?.nickname || '单聊';
 };
+
+const findExistingDmConversation = (ownerUserId: string, peerUserId: string) =>
+  state.conversations.find(
+    (item) =>
+      item.type === 'DM' &&
+      item.members.length === 2 &&
+      item.members.includes(ownerUserId) &&
+      item.members.includes(peerUserId)
+  );
 
 const toConversationRow = (conversation: PreviewConversation, currentUserId: string) => ({
   id: conversation.id,
@@ -315,6 +492,19 @@ const scheduleAutoReply = (conversationId: string, senderId: string, text: strin
 export const isPreviewStoreEnabled = () => !process.env.DATABASE_URL;
 
 export const previewStore = {
+  reset() {
+    const next = createInitialState();
+    state.users.splice(0, state.users.length, ...next.users);
+    state.conversations.splice(0, state.conversations.length, ...next.conversations);
+    state.friendRequests.splice(0, state.friendRequests.length, ...next.friendRequests);
+    state.tags.splice(0, state.tags.length, ...next.tags);
+    state.receipts.splice(0, state.receipts.length, ...next.receipts);
+    for (const key of Object.keys(state.messages)) {
+      delete state.messages[key];
+    }
+    Object.assign(state.messages, next.messages);
+  },
+
   register(input: { phone: string; password: string; deviceId: string; nickname?: string }) {
     const existing = getUserByPhone(input.phone);
     if (existing) {
@@ -529,5 +719,91 @@ export const previewStore = {
       status: 'acknowledged',
       createdAt: receipt.createdAt
     };
+  },
+
+  listFriendRequests(phone: string) {
+    const user = ensureUser({ phone });
+    return state.friendRequests
+      .filter((item) => item.toUserId === user.id)
+      .sort((a, b) => `${b.createdAt}`.localeCompare(`${a.createdAt}`))
+      .map((item) => mapFriendRequestRow(item));
+  },
+
+  acceptFriendRequest(input: { phone: string; requestId: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const request = state.friendRequests.find((item) => item.id === input.requestId && item.toUserId === user.id);
+    if (!request) {
+      throw new Error('friend request not found');
+    }
+
+    request.status = 'ACCEPTED';
+    const fromUser = getUserById(request.fromUserId);
+    if (fromUser) {
+      this.createDm({ ownerPhone: user.phone, peerPhone: fromUser.phone });
+    }
+
+    return mapFriendRequestRow(request);
+  },
+
+  listTags(phone: string) {
+    const user = ensureUser({ phone });
+    return state.tags
+      .filter((item) => item.ownerUserId === user.id)
+      .sort((a, b) => `${b.createdAt}`.localeCompare(`${a.createdAt}`))
+      .map((item) => mapTagRow(item));
+  },
+
+  createTag(input: { phone: string; title: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const title = input.title.trim();
+    if (!title) {
+      throw new Error('tag title required');
+    }
+
+    const tag: PreviewTag = {
+      id: `tag-${randomUUID()}`,
+      ownerUserId: user.id,
+      title,
+      note: '新建标签，后续可继续补充成员。',
+      memberUserIds: [],
+      createdAt: new Date().toISOString()
+    };
+    state.tags.unshift(tag);
+    return mapTagRow(tag);
+  },
+
+  search(input: { phone: string; keyword?: string }) {
+    const user = ensureUser({ phone: input.phone });
+    const keyword = input.keyword?.trim().toLowerCase() || '';
+
+    const contacts = state.users
+      .filter((item) => item.id !== user.id)
+      .map((item) => ({
+        id: `contact-${item.id}`,
+        title: item.nickname,
+        subtitle: `联系人 · ${item.phone}`,
+        type: '联系人' as const,
+        to: `/h5/${(() => {
+          const existing = findExistingDmConversation(user.id, item.id);
+          return existing ? `chat/${existing.id}` : 'contacts/friends';
+        })()}`
+      }));
+
+    const groups = state.conversations
+      .filter((item) => item.type === 'GROUP' && item.members.includes(user.id))
+      .map((item) => ({
+        id: `group-${item.id}`,
+        title: item.title || '未命名群聊',
+        subtitle: `群聊 · ${item.lastMessage || '进入群聊查看最新消息'}`,
+        type: '群聊' as const,
+        to: `/h5/chat/${item.id}`
+      }));
+
+    const rows = [...contacts, ...groups, ...previewServiceEntries, ...previewContentEntries];
+    if (!keyword) {
+      return rows;
+    }
+
+    return rows.filter((item) => `${item.title} ${item.subtitle} ${item.type}`.toLowerCase().includes(keyword));
   }
 };

@@ -30,6 +30,7 @@ describe('conversationRoutes', () => {
   beforeEach(() => {
     delete process.env.DATABASE_URL;
     process.env.JWT_SECRET = '12345678901234567890123456789012';
+    previewStore.reset();
   });
 
   it('rejects unauthenticated', async () => {
