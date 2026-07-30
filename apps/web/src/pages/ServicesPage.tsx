@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { serviceSections } from './wechatSecondaryData';
 
 export default function ServicesPage() {
   return (
@@ -7,16 +8,32 @@ export default function ServicesPage() {
       <header className="top-bar top-bar-split">
         <div>
           <h1>服务</h1>
-          <p>这里会展示支付、生活服务和常用工具入口。</p>
+          <p>聚合资金、业务和账号类服务，作为“我的”页的统一服务中心。</p>
         </div>
         <Link className="mini-link" to="/h5/me">
           返回我的
         </Link>
       </header>
-      <div className="placeholder-list">
-        <section className="section-card">
-          <p>这里会展示支付、生活服务和常用工具入口。</p>
-        </section>
+      <div className="placeholder-list detail-page">
+        {serviceSections.map((section) => (
+          <section key={section.title} className="service-group-card">
+            <div className="service-group-header">
+              <strong>{section.title}</strong>
+            </div>
+            <div className="service-group-list">
+              {section.items.map((item) => (
+                <Link key={item.to} className="detail-row-link" to={item.to}>
+                  <article className="detail-row-card">
+                    <div className="detail-copy">
+                      <strong>{item.title}</strong>
+                      <p>{item.subtitle}</p>
+                    </div>
+                  </article>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </section>
   );

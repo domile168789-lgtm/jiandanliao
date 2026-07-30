@@ -195,6 +195,15 @@ describe('App route entry', () => {
     }
   });
 
+  it('renders actionable friend requests page', async () => {
+    renderAt('/h5/contacts/friends', { token: 'demo-token' });
+
+    expect((await screen.findAllByRole('button', { name: '通过' })).length).toBeGreaterThan(0);
+    expect(screen.getByText('手机号添加入口')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '通过' })[0]);
+    expect(screen.getAllByRole('button', { name: '已通过' }).length).toBeGreaterThan(0);
+  });
+
   it('renders wechat-style contacts entry rows', async () => {
     renderAt('/h5/contacts', { token: 'demo-token' });
 
@@ -222,6 +231,16 @@ describe('App route entry', () => {
     }
   });
 
+  it('filters search hub results', async () => {
+    renderAt('/h5/discover/search', { token: 'demo-token' });
+
+    fireEvent.change(await screen.findByLabelText('搜索联系人、群聊、服务或内容'), {
+      target: { value: '钱包' }
+    });
+    expect(screen.getByRole('link', { name: /钱包/ })).toHaveAttribute('href', '/h5/wallet');
+    expect(screen.queryByRole('link', { name: /商务对接/ })).not.toBeInTheDocument();
+  });
+
   it('renders wechat-style discover rows', async () => {
     renderAt('/h5/discover', { token: 'demo-token' });
 
@@ -244,6 +263,14 @@ describe('App route entry', () => {
       renderAt(route.path, { token: 'demo-token' });
       expect(await screen.findByRole('heading', { level: 1, name: route.heading })).toBeInTheDocument();
     }
+  });
+
+  it('renders service center links on services page', async () => {
+    renderAt('/h5/me/services', { token: 'demo-token' });
+
+    expect(await screen.findByRole('link', { name: /钱包/ })).toHaveAttribute('href', '/h5/wallet');
+    expect(screen.getByRole('link', { name: /安全中心/ })).toHaveAttribute('href', '/h5/security');
+    expect(screen.getByRole('link', { name: /设置/ })).toHaveAttribute('href', '/h5/settings');
   });
 
   it('renders wechat-style me sections', async () => {
