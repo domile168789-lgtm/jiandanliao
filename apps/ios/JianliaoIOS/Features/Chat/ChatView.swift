@@ -18,6 +18,15 @@ struct ChatView: View {
 
   var body: some View {
     VStack(spacing: 0) {
+      HStack {
+        Text("当前会话已接入真实消息接口，发送后会自动刷新并同步已读。")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+        Spacer()
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+
       List {
         ForEach(messages) { m in
           MessageRow(message: m, isMine: isMine(m))
@@ -48,6 +57,13 @@ struct ChatView: View {
     }
     .navigationTitle(title(for: conversation))
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .topBarTrailing) {
+        Button("刷新") {
+          Task { await loadHistory() }
+        }
+      }
+    }
     .overlay {
       if isLoading {
         ProgressView().progressViewStyle(.circular)
@@ -112,6 +128,7 @@ struct ChatView: View {
         messages.append(sent)
         messages.sort { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
       }
+      await loadHistory()
     } catch {
       errorText = error.localizedDescription
     }
@@ -150,6 +167,7 @@ struct ChatView: View {
         messages.append(sent)
         messages.sort { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
       }
+      await loadHistory()
     } catch {
       errorText = error.localizedDescription
     }
@@ -165,7 +183,18 @@ struct ChatView: View {
 
   private func title(for conversation: Conversation) -> String {
     if let title = conversation.title, !title.isEmpty { return title }
-    return conversation.type == "DM" ? "单聊会话" : "群聊会话"
+    switch conversation.id {
+    case "preview-system":
+      return "系统通知"
+    case "preview-dm-business":
+      return "商务对接"
+    case "preview-group-agency":
+      return "渠道伙伴群"
+    case "preview-dm-security":
+      return "安全专员"
+    default:
+      return conversation.type == "DM" ? "聊天" : "群聊"
+    }
   }
 
   private func sendReadReceiptIfNeeded(message: Message) async {
@@ -183,39 +212,34 @@ private struct MessageRow: View {
   let message: Message
   let isMine: Bool
 
-  private var isBot: Bool {
-    message.senderId?.hasPrefix("system") == true
+  private var isSystem: Bool {
+    message.senderId?.hasPrefix("system") == true || message.type == .text && (message.body.text?.contains("系统") == true && message.senderId == nil)
   }
 
   var body: some View {
     HStack {
-      if isBot {
+      if isSystem {
         Spacer(minLength: 20)
       } else if isMine {
         Spacer(minLength: 40)
       }
 
-      VStack(alignment: isBot ? .center : .leading, spacing: 6) {
-        if isBot {
-          Text("系统/机器人消息")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-
+      VStack(alignment: isSystem ? .center : .leading, spacing: 6) {
+        Text(senderLabel)
+          .font(.caption)
+          .foregroundStyle(.secondary)
         content
 
-        if isBot, let senderId = message.senderId {
-          Text(senderId)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-        }
+        Text(metaText)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
       }
-      .frame(maxWidth: isBot ? .infinity : nil, alignment: isBot ? .center : .leading)
+      .frame(maxWidth: isSystem ? .infinity : 260, alignment: isSystem ? .center : .leading)
       .padding(10)
       .background(backgroundColor)
       .clipShape(RoundedRectangle(cornerRadius: 12))
 
-      if isBot {
+      if isSystem {
         Spacer(minLength: 20)
       } else if !isMine {
         Spacer(minLength: 40)
@@ -224,10 +248,21 @@ private struct MessageRow: View {
   }
 
   private var backgroundColor: Color {
-    if isBot {
+    if isSystem {
       return Color.orange.opacity(0.12)
     }
     return isMine ? Color.blue.opacity(0.15) : Color.gray.opacity(0.12)
+  }
+
+  private var senderLabel: String {
+    if isSystem { return "系统通知" }
+    return isMine ? "我" : "对方"
+  }
+
+  private var metaText: String {
+    let timeText = message.createdAt?.formatted(date: .omitted, time: .shortened) ?? "刚刚"
+    let statusText = message.status?.rawValue ?? "SENT"
+    return "\(timeText) · \(statusText)"
   }
 
   @ViewBuilder

@@ -4,6 +4,7 @@ import { getDb } from '../../db.js';
 import { ConversationService } from '../conversations/conversation.service.js';
 import { consumeRateLimit, RateLimitError } from '../../shared/rate-limit.js';
 import { resolveUserAccessByPhone, UserAccessError } from '../../shared/user-access.service.js';
+import { previewStore } from '../im-preview/preview-store.js';
 
 const isForbiddenConversationAccess = (error: unknown) =>
   error instanceof Error && error.message === 'forbidden conversation access';
@@ -14,7 +15,6 @@ export async function messageRoutes(app: FastifyInstance) {
 
   app.get('/messages', async (request, reply) => {
     if (!request.user?.phone) return reply.code(401).send({ code: 'UNAUTHORIZED' });
-    if (!process.env.DATABASE_URL) return reply.code(501).send({ code: 'NOT_IMPLEMENTED' });
     try {
       await resolveUserAccessByPhone(request.user.phone);
     } catch (error) {
@@ -38,6 +38,14 @@ export async function messageRoutes(app: FastifyInstance) {
       throw error;
     }
 
+    if (!process.env.DATABASE_URL) {
+      return previewStore.listMessages({
+        conversationId,
+        phone: request.user.phone,
+        limit: Number(limit || 50)
+      });
+    }
+
     const db = getDb();
     const [rows] = await db.execute<any[]>(
       `SELECT id, conversation_id AS conversationId, sender_id AS senderId, type, status,
@@ -53,7 +61,6 @@ export async function messageRoutes(app: FastifyInstance) {
 
   app.post('/messages', async (request, reply) => {
     if (!request.user?.phone) return reply.code(401).send({ code: 'UNAUTHORIZED' });
-    if (!process.env.DATABASE_URL) return reply.code(501).send({ code: 'NOT_IMPLEMENTED' });
     const body = request.body as {
       conversationId: string;
       type: 'TEXT' | 'IMAGE' | 'FILE' | 'AUDIO' | 'VIDEO' | 'SYSTEM';
@@ -76,6 +83,14 @@ export async function messageRoutes(app: FastifyInstance) {
         windowMs: 10_000
       });
       const access = await resolveUserAccessByPhone(request.user.phone);
+      if (!process.env.DATABASE_URL) {
+        return previewStore.createMessage({
+          conversationId: body.conversationId,
+          phone: request.user.phone,
+          type: body.type,
+          body: body.body
+        });
+      }
       return await service.create({ ...body, senderId: access.userId });
     } catch (error) {
       if (error instanceof RateLimitError) {

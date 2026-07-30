@@ -34,7 +34,10 @@ class SessionsViewModel : ViewModel() {
                 _state.value = _state.value.copy(loading = true, error = null)
                 ServiceLocator.conversationRepository.list()
             }.onSuccess { list ->
-                _state.value = _state.value.copy(loading = false, conversations = list)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    conversations = list.sortedByDescending { it.updatedAt ?: "" }
+                )
             }.onFailure { e ->
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "加载会话失败")
             }
@@ -61,4 +64,3 @@ class SessionsViewModel : ViewModel() {
         }
     }
 }
-

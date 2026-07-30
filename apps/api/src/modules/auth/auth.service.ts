@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../../db.js';
 import { signAccessToken, signRefreshToken } from './token.js';
 import { hashPassword, verifyPassword } from './password.js';
+import { previewStore } from '../im-preview/preview-store.js';
 
 type RegisterInput = { phone: string; password: string; deviceId: string; platform?: string; nickname?: string };
 type LoginSmsInput = { phone: string; code: string; deviceId: string; platform?: string };
@@ -10,7 +11,13 @@ type RefreshInput = { phone: string; refreshToken: string; deviceId: string };
 
 export class AuthService {
   async register(input: RegisterInput) {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+    if (!process.env.DATABASE_URL) {
+      const result = previewStore.register(input);
+      return {
+        accessToken: signAccessToken({ sub: input.phone, deviceId: input.deviceId }),
+        refreshToken: result.refreshToken
+      };
+    }
     const db = getDb();
     const now = new Date();
 
@@ -103,7 +110,13 @@ export class AuthService {
   }
 
   async loginWithPassword(input: LoginPasswordInput) {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+    if (!process.env.DATABASE_URL) {
+      const result = previewStore.login(input);
+      return {
+        accessToken: signAccessToken({ sub: input.phone, deviceId: input.deviceId }),
+        refreshToken: result.refreshToken
+      };
+    }
     const db = getDb();
     const now = new Date();
     const platform = input.platform || 'unknown';
@@ -136,7 +149,13 @@ export class AuthService {
   }
 
   async refreshToken(input: RefreshInput) {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+    if (!process.env.DATABASE_URL) {
+      const result = previewStore.refresh(input);
+      return {
+        accessToken: signAccessToken({ sub: input.phone, deviceId: input.deviceId }),
+        refreshToken: result.refreshToken
+      };
+    }
     const db = getDb();
     const [rows] = await db.execute<any[]>(
       `SELECT d.refresh_token AS refreshToken

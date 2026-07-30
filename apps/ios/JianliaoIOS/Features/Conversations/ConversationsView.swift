@@ -14,6 +14,15 @@ struct ConversationsView: View {
   var body: some View {
     NavigationStack {
       List {
+        if !conversations.isEmpty {
+          Section {
+            Text("最近会话、系统通知和运营消息都会集中在这里，当前已接入真实 IM 接口。")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+          .listRowBackground(Color.clear)
+        }
+
         if let errorText, conversations.isEmpty, !isLoading {
           Section {
             EmptyStateCard(
@@ -51,20 +60,7 @@ struct ConversationsView: View {
 
           ForEach(conversations) { c in
             NavigationLink(value: c) {
-              VStack(alignment: .leading, spacing: 4) {
-                Text(title(for: c))
-                  .font(.headline)
-                if let last = c.lastMessage, !last.isEmpty {
-                  Text(last)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                } else {
-                  Text("暂无最近消息")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                }
-              }
+              ConversationRowCard(conversation: c, title: title(for: c))
             }
           }
         }
@@ -72,7 +68,7 @@ struct ConversationsView: View {
       .navigationDestination(for: Conversation.self) { c in
         ChatView(conversation: c)
       }
-      .navigationTitle("会话")
+      .navigationTitle("消息")
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
           Button("退出") {
@@ -107,8 +103,13 @@ struct ConversationsView: View {
         NavigationStack {
           Form {
             Section("对方手机号") {
-              TextField("peerPhone", text: $peerPhone)
+              TextField("例如 855010100002", text: $peerPhone)
                 .keyboardType(.numberPad)
+            }
+            Section("联调提示") {
+              Text("可直接发起 855010100002、855010100003、855010100004 这些演示会话。")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
           }
           .navigationTitle("新建单聊")
@@ -136,7 +137,18 @@ struct ConversationsView: View {
 
   private func title(for c: Conversation) -> String {
     if let t = c.title, !t.isEmpty { return t }
-    return c.type == "DM" ? "单聊会话" : "群聊会话"
+    switch c.id {
+    case "preview-system":
+      return "系统通知"
+    case "preview-dm-business":
+      return "商务对接"
+    case "preview-group-agency":
+      return "渠道伙伴群"
+    case "preview-dm-security":
+      return "安全专员"
+    default:
+      return c.type == "DM" ? "新的私聊" : "新的群聊"
+    }
   }
 
   private func reload() async {
@@ -159,6 +171,90 @@ struct ConversationsView: View {
       await reload()
     } catch {
       errorText = error.localizedDescription
+    }
+  }
+}
+
+private struct ConversationRowCard: View {
+  let conversation: Conversation
+  let title: String
+
+  var body: some View {
+    HStack(spacing: 12) {
+      ZStack {
+        Circle()
+          .fill(avatarColor)
+          .frame(width: 42, height: 42)
+        Text(String(title.prefix(1)))
+          .font(.headline)
+          .foregroundStyle(.white)
+      }
+
+      VStack(alignment: .leading, spacing: 6) {
+        HStack {
+          Text(title)
+            .font(.headline)
+          Spacer()
+          Text(updatedText)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+
+        Text(typeLabel)
+          .font(.caption)
+          .foregroundStyle(avatarColor)
+
+        Text(previewText)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+    }
+    .padding(.vertical, 4)
+  }
+
+  private var previewText: String {
+    if let last = conversation.lastMessage, !last.isEmpty {
+      return last
+    }
+    switch conversation.id {
+    case "preview-system":
+      return "查看后台公告、风控结果和活动提醒。"
+    case "preview-dm-business":
+      return "商务消息会在这里持续跟进。"
+    case "preview-group-agency":
+      return "群聊动态、投放排期和协作消息会在这里同步。"
+    case "preview-dm-security":
+      return "账号安全提醒和处理建议会在这里更新。"
+    default:
+      return "打开会话开始沟通。"
+    }
+  }
+
+  private var typeLabel: String {
+    switch conversation.type {
+    case "SYSTEM":
+      return "系统通知"
+    case "GROUP":
+      return "群聊"
+    default:
+      return "单聊"
+    }
+  }
+
+  private var updatedText: String {
+    guard let updatedAt = conversation.updatedAt else { return "刚刚" }
+    return updatedAt.formatted(date: .omitted, time: .shortened)
+  }
+
+  private var avatarColor: Color {
+    switch conversation.type {
+    case "SYSTEM":
+      return .orange
+    case "GROUP":
+      return .purple
+    default:
+      return .blue
     }
   }
 }

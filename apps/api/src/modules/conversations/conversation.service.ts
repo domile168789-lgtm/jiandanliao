@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../../db.js';
+import { previewStore } from '../im-preview/preview-store.js';
 
 export class ConversationService {
   private async getUserIdByPhone(phone: string) {
@@ -114,7 +115,9 @@ export class ConversationService {
   }
 
   async createDmByPhones(input: { ownerPhone: string; peerPhone: string }) {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+    if (!process.env.DATABASE_URL) {
+      return previewStore.createDm(input);
+    }
     const ownerId = await this.getUserIdByPhone(input.ownerPhone);
     const peerId = await this.getUserIdByPhone(input.peerPhone);
 
@@ -228,7 +231,9 @@ export class ConversationService {
   }
 
   async listByPhone(phone: string) {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+    if (!process.env.DATABASE_URL) {
+      return previewStore.listConversations(phone);
+    }
     const db = getDb();
     const [rows] = await db.execute<any[]>(
       `SELECT c.id, c.type, c.title, c.last_message AS lastMessage, c.updated_at AS updatedAt
@@ -244,7 +249,14 @@ export class ConversationService {
   }
 
   async assertConversationMember(conversationId: string, phone: string) {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+    if (!process.env.DATABASE_URL) {
+      const access = previewStore.resolveUserAccess(phone);
+      const rows = previewStore.listConversations(phone);
+      if (!rows.some((row) => row.id === conversationId) || !access.userId) {
+        throw new Error('forbidden conversation access');
+      }
+      return;
+    }
     const db = getDb();
     const [rows] = await db.execute<any[]>(
       `SELECT 1

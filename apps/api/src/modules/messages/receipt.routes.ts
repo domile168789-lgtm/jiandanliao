@@ -4,6 +4,7 @@ import { getDb } from '../../db.js';
 import { getRedis } from '../../redis.js';
 import { ConversationService } from '../conversations/conversation.service.js';
 import { resolveUserAccessByPhone, UserAccessError } from '../../shared/user-access.service.js';
+import { previewStore } from '../im-preview/preview-store.js';
 
 const receiptTypes = new Set(['DELIVERED', 'READ']);
 
@@ -15,7 +16,6 @@ export async function receiptRoutes(app: FastifyInstance) {
 
   app.post('/messages/:id/receipt', async (request, reply) => {
     if (!request.user?.phone) return reply.code(401).send({ code: 'UNAUTHORIZED' });
-    if (!process.env.DATABASE_URL) return reply.code(501).send({ code: 'NOT_IMPLEMENTED' });
 
     const { id: messageId } = request.params as { id: string };
     const body = request.body as { type: 'DELIVERED' | 'READ' };
@@ -35,6 +35,24 @@ export async function receiptRoutes(app: FastifyInstance) {
         return reply.code(401).send({ code: 'UNAUTHORIZED' });
       }
       throw error;
+    }
+
+    if (!process.env.DATABASE_URL) {
+      try {
+        return previewStore.acknowledgeReceipt({
+          messageId,
+          phone: request.user.phone,
+          type: receiptType as 'DELIVERED' | 'READ'
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message === 'message not found') {
+          return reply.code(404).send({ code: 'NOT_FOUND' });
+        }
+        if (isForbiddenConversationAccess(error)) {
+          return reply.code(403).send({ code: 'FORBIDDEN' });
+        }
+        throw error;
+      }
     }
 
     // 找消息所属会话，便于 ws 推送

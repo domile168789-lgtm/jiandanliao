@@ -26,6 +26,7 @@
 
 ## 原生端补验
 
+- Android / iOS 先确认会话列表、聊天发送、自动回复、READ 回执符合 IM 主链路预期
 - Android 在真实构建环境执行一次 `./gradlew assembleDebug`
 - iOS 在 macOS / Xcode 环境执行一次 `xcodebuild` 或 Xcode Archive
 - Windows 管理后台在 Windows 打包环境执行一次 `pnpm --filter @jianliao/admin-desktop dist:win`

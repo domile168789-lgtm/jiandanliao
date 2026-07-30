@@ -1,6 +1,5 @@
-import { getAccessToken } from '../state/session';
 import { apiGet, apiPost } from './client';
-import { withDemoFallback, type DataSource, type LoadableData } from './loadable';
+import { withDemoFallback, type LoadableData } from './loadable';
 
 export type ConversationRow = {
   id: string;
@@ -19,9 +18,6 @@ export type MessageRow = {
   createdAt: string | null;
 };
 
-const PREVIEW_QUERY_KEY = 'preview';
-const PREVIEW_QUERY_VALUE = 'demo';
-const PREVIEW_ACCESS_TOKEN = 'preview-demo-token';
 const PREVIEW_STORAGE_KEY = 'jiandanliao_preview_im_v1';
 const PREVIEW_UPDATE_EVENT = 'jiandanliao:preview-im-updated';
 
@@ -144,13 +140,6 @@ const previewSeedStore = (): PreviewStore => ({
   }
 });
 
-const isPreviewDemoMode = () => {
-  if (typeof window === 'undefined') return false;
-  const params = new URLSearchParams(window.location.search);
-  if (params.get(PREVIEW_QUERY_KEY) === PREVIEW_QUERY_VALUE) return true;
-  return getAccessToken() === PREVIEW_ACCESS_TOKEN;
-};
-
 const dispatchPreviewUpdate = () => {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(PREVIEW_UPDATE_EVENT));
@@ -191,11 +180,6 @@ const savePreviewStore = (store: PreviewStore) => {
   window.localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(store));
   dispatchPreviewUpdate();
 };
-
-const getPreviewNotice = (source: DataSource) =>
-  source === 'demo'
-    ? '当前为本地 IM 演示环境：支持会话切换、发送消息、自动回复和会话列表实时更新。'
-    : undefined;
 
 const getMessageText = (message: MessageRow) => {
   if (typeof message.body.text === 'string' && message.body.text.trim()) return message.body.text.trim();
@@ -355,18 +339,10 @@ export async function listConversations(fetcher: typeof fetch = fetch): Promise<
 }
 
 export async function loadConversations(fetcher: typeof fetch = fetch): Promise<LoadableData<ConversationRow[]>> {
-  if (isPreviewDemoMode()) {
-    return {
-      data: getPreviewConversationRows(),
-      source: 'demo',
-      notice: getPreviewNotice('demo')
-    };
-  }
-
   return withDemoFallback(
     () => listConversations(fetcher),
     getPreviewConversationRows(),
-    '会话列表接口暂不可用，当前展示 IM 演示会话。'
+    '会话列表接口暂不可用，当前展示降级 IM 演示会话。'
   );
 }
 
@@ -393,18 +369,10 @@ export async function loadMessages(
   conversationId: string,
   fetcher: typeof fetch = fetch
 ): Promise<LoadableData<MessageRow[]>> {
-  if (isPreviewDemoMode()) {
-    return {
-      data: getPreviewConversationMessages(conversationId),
-      source: 'demo',
-      notice: getPreviewNotice('demo')
-    };
-  }
-
   return withDemoFallback(
     () => listMessages(conversationId, fetcher),
     getPreviewConversationMessages(conversationId),
-    '消息接口暂不可用，当前展示 IM 演示消息。'
+    '消息接口暂不可用，当前展示降级 IM 演示消息。'
   );
 }
 
@@ -413,20 +381,6 @@ export async function sendTextMessage(
   text: string,
   fetcher: typeof fetch = fetch
 ): Promise<MessageRow | null> {
-  if (isPreviewDemoMode()) {
-    const created: MessageRow = {
-      id: `preview-${Date.now()}`,
-      conversationId,
-      senderId: 'self',
-      type: 'TEXT',
-      body: { text },
-      createdAt: new Date().toISOString()
-    };
-    appendPreviewMessage(conversationId, created);
-    schedulePreviewReply(conversationId, text);
-    return created;
-  }
-
   const payload = await apiPost<unknown>(
     '/api/messages',
     {
@@ -444,16 +398,6 @@ export async function createDirectConversation(
   peerPhone: string,
   fetcher: typeof fetch = fetch
 ): Promise<ConversationRow | null> {
-  if (isPreviewDemoMode()) {
-    const normalizedPhone = peerPhone.replace(/\D/g, '');
-    const matchedContact = previewContacts.find((item) => item.phone.replace(/\D/g, '') === normalizedPhone);
-    return ensurePreviewConversation({
-      id: buildFallbackConversationId(peerPhone),
-      title: matchedContact?.title || `联系人 ${normalizedPhone.slice(-4) || '演示'}`,
-      type: matchedContact?.type || 'DM'
-    });
-  }
-
   const payload = await apiPost<unknown>(
     '/api/conversations/dm',
     {

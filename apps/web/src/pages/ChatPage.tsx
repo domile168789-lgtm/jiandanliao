@@ -71,6 +71,10 @@ export default function ChatPage() {
     if (conversationId === 'demo-business') return '商务对接';
     if (conversationId === 'demo-agency') return '渠道伙伴群';
     if (conversationId === 'demo-security') return '安全专员';
+    if (conversationId === 'preview-system') return '系统通知';
+    if (conversationId === 'preview-dm-business') return '商务对接';
+    if (conversationId === 'preview-group-agency') return '渠道伙伴群';
+    if (conversationId === 'preview-dm-security') return '安全专员';
     if (conversationId.startsWith('contact-')) return '单聊会话';
     if (latestSystem && typeof latestSystem.body.title === 'string') return latestSystem.body.title;
     return '聊天';
@@ -105,6 +109,7 @@ export default function ChatPage() {
           }
           return [...nextMessages, created];
         });
+        void refresh();
       }
     } catch (error) {
       setMessages((current) => current.filter((item) => item.id !== optimisticMessage.id));

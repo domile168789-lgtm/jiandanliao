@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,10 +25,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.jianliao.android.core.ServiceLocator
+import com.jianliao.android.data.model.MessageDto
 import com.jianliao.android.ui.vm.ChatViewModel
 import com.jianliao.android.ui.vm.ChatViewModelFactory
 
@@ -40,6 +44,7 @@ fun ChatScreen(
     val context = LocalContext.current
     val vm: ChatViewModel = viewModel(factory = ChatViewModelFactory(conversationId))
     val state by vm.state.collectAsState()
+    val session by ServiceLocator.sessionState.collectAsState()
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -50,7 +55,7 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("单聊消息 (GET /api/messages) | $conversationId") }
+                title = { Text(chatTitle(conversationId)) }
             )
         }
     ) { padding ->
@@ -66,9 +71,26 @@ fun ChatScreen(
                 Button(onClick = vm::refresh) { Text("刷新") }
                 if (state.loading) CircularProgressIndicator(modifier = Modifier.padding(start = 8.dp))
             }
+            Text(
+                "当前会话已接入真实消息接口，发送后会自动刷新并同步已读回执。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-            if (state.error != null) Text("错误：${state.error}")
-            if (state.lastReceiptLog != null) Text(state.lastReceiptLog ?: "")
+            if (state.error != null) {
+                Text(
+                    "消息处理失败：${state.error}",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            if (state.lastReceiptLog != null) {
+                Text(
+                    "已同步最新已读状态。",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
 
             LazyColumn(
                 modifier = Modifier
@@ -77,46 +99,55 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(state.messages) { m ->
-                    val isBotMessage = isBotMessage(m)
+                    val isSystemMessage = isSystemMessage(m)
+                    val isMine = isMine(m, session.userId)
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = if (isBotMessage) androidx.compose.ui.Alignment.CenterHorizontally else androidx.compose.ui.Alignment.Start
+                        horizontalAlignment = when {
+                            isSystemMessage -> Alignment.CenterHorizontally
+                            isMine -> Alignment.End
+                            else -> Alignment.Start
+                        }
                     ) {
                         Column(
                             modifier = Modifier
-                                .fillMaxWidth()
+                                .fillMaxWidth(if (isSystemMessage) 1f else 0.82f)
                                 .background(
-                                    color = if (isBotMessage) {
+                                    color = if (isSystemMessage) {
                                         MaterialTheme.colorScheme.secondaryContainer
+                                    } else if (isMine) {
+                                        MaterialTheme.colorScheme.primaryContainer
                                     } else {
                                         MaterialTheme.colorScheme.surfaceVariant
                                     },
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(
+                                        topStart = 18.dp,
+                                        topEnd = 18.dp,
+                                        bottomStart = if (isMine) 18.dp else 4.dp,
+                                        bottomEnd = if (isMine) 4.dp else 18.dp
+                                    )
                                 )
                                 .padding(12.dp)
                         ) {
-                            if (isBotMessage) {
-                                Text("系统/机器人消息", color = MaterialTheme.colorScheme.onSecondaryContainer)
-                            } else {
-                                Text("senderId=${m.senderId} type=${m.type} id=${m.id}")
-                            }
-                            Text("createdAt=${m.createdAt ?: "-"} status=${m.status ?: "-"}")
+                            Text(
+                                messageSenderLabel(m, isMine, isSystemMessage),
+                                color = if (isSystemMessage) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                style = MaterialTheme.typography.labelMedium
+                            )
                             when (m.type) {
                                 "TEXT" -> Text((m.body["text"] as? String).orEmpty())
-                                "IMAGE" -> Text("image(fileId=${m.body["fileId"]}, objectKey=${m.body["objectKey"]})")
-                                else -> Text("body=${m.body}")
+                                "IMAGE" -> Text("[图片消息]")
+                                else -> Text("[${m.type}]")
                             }
-                        }
-                        if (!isBotMessage) {
-                            Button(onClick = { vm.sendReadReceipt(m.id) }) {
-                                Text("发送 READ 回执 (POST /api/messages/:id/receipt)")
-                            }
-                        }
-                        if (isBotMessage) {
                             Text(
-                                "senderId=${m.senderId}",
+                                messageMeta(m),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(top = 6.dp)
                             )
                         }
                     }
@@ -128,7 +159,8 @@ fun ChatScreen(
                     modifier = Modifier.weight(1f),
                     value = state.inputText,
                     onValueChange = vm::updateInput,
-                    label = { Text("输入文本消息") },
+                    label = { Text("输入消息") },
+                    placeholder = { Text("说点什么...") },
                     singleLine = true
                 )
                 Button(onClick = vm::sendText) { Text("发送") }
@@ -142,13 +174,38 @@ fun ChatScreen(
                     )
                 }
             ) {
-                Text("选择图片并发送 (POST /api/files/upload -> PUT uploadUrl -> POST /api/messages[type=IMAGE])")
+                Text("发送图片")
             }
         }
     }
 }
 
-private fun isBotMessage(message: com.jianliao.android.data.model.MessageDto): Boolean {
+private fun isSystemMessage(message: MessageDto): Boolean {
     val text = message.body["text"] as? String
-    return message.senderId.startsWith("system") || text?.contains("群机器人") == true
+    return message.senderId.startsWith("system") || message.type == "SYSTEM" || text?.contains("群机器人") == true
+}
+
+private fun isMine(message: MessageDto, userId: String?): Boolean =
+    !userId.isNullOrBlank() && message.senderId == userId
+
+private fun chatTitle(conversationId: String): String =
+    when (conversationId) {
+        "preview-system" -> "系统通知"
+        "preview-dm-business" -> "商务对接"
+        "preview-group-agency" -> "渠道伙伴群"
+        "preview-dm-security" -> "安全专员"
+        else -> "聊天"
+    }
+
+private fun messageSenderLabel(message: MessageDto, isMine: Boolean, isSystemMessage: Boolean): String =
+    when {
+        isSystemMessage -> "系统通知"
+        isMine -> "我"
+        else -> "对方"
+    }
+
+private fun messageMeta(message: MessageDto): String {
+    val createdAt = message.createdAt?.replace("T", " ")?.removeSuffix("Z")?.take(16) ?: "刚刚"
+    val status = message.status ?: "SENT"
+    return "$createdAt · $status"
 }

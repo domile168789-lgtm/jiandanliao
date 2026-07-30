@@ -38,7 +38,8 @@ class ChatViewModel(
         viewModelScope.launch {
             ServiceLocator.socketRepository.messages.collect { msg ->
                 if (msg.conversationId == conversationId) {
-                    _state.value = _state.value.copy(messages = (_state.value.messages + msg))
+                    _state.value = _state.value.copy(messages = mergeMessage(_state.value.messages, msg))
+                    acknowledgeIncomingIfNeeded(msg)
                 }
             }
         }
@@ -53,14 +54,20 @@ class ChatViewModel(
         _state.value = _state.value.copy(inputText = v, error = null)
     }
 
-    fun refresh() {
+    fun refresh(showLoading: Boolean = true) {
         viewModelScope.launch {
             runCatching {
-                _state.value = _state.value.copy(loading = true, error = null)
+                if (showLoading) {
+                    _state.value = _state.value.copy(loading = true, error = null)
+                } else {
+                    _state.value = _state.value.copy(error = null)
+                }
                 ServiceLocator.messageRepository.list(conversationId, limit = 50)
             }.onSuccess { list ->
                 // 后端按 created_at DESC；UI 展示按时间正序
-                _state.value = _state.value.copy(loading = false, messages = list.reversed())
+                val ordered = sortMessages(list.reversed())
+                _state.value = _state.value.copy(loading = false, messages = ordered)
+                ordered.lastOrNull { !isMessageFromCurrentUser(it) }?.let(::acknowledgeIncomingIfNeeded)
             }.onFailure { e ->
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "加载消息失败")
             }
@@ -75,7 +82,12 @@ class ChatViewModel(
                 _state.value = _state.value.copy(loading = true, error = null)
                 ServiceLocator.messageRepository.sendText(conversationId, text)
             }.onSuccess { msg ->
-                _state.value = _state.value.copy(loading = false, inputText = "", messages = _state.value.messages + msg)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    inputText = "",
+                    messages = mergeMessage(_state.value.messages, msg)
+                )
+                refresh(showLoading = false)
             }.onFailure { e ->
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "发送失败")
             }
@@ -113,7 +125,11 @@ class ChatViewModel(
                     mimeType = mimeType
                 )
             }.onSuccess { msg ->
-                _state.value = _state.value.copy(loading = false, messages = _state.value.messages + msg)
+                _state.value = _state.value.copy(
+                    loading = false,
+                    messages = mergeMessage(_state.value.messages, msg)
+                )
+                refresh(showLoading = false)
             }.onFailure { e ->
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "发送图片失败")
             }
@@ -138,5 +154,23 @@ class ChatViewModel(
 
             Triple(filename, mimeType, bytes)
         }
-}
 
+    private fun acknowledgeIncomingIfNeeded(message: MessageDto) {
+        if (!isMessageFromCurrentUser(message)) {
+            sendReadReceipt(message.id)
+        }
+    }
+
+    private fun isMessageFromCurrentUser(message: MessageDto): Boolean {
+        val userId = ServiceLocator.sessionState.value.userId
+        return !userId.isNullOrBlank() && userId == message.senderId
+    }
+
+    private fun mergeMessage(current: List<MessageDto>, incoming: MessageDto): List<MessageDto> {
+        val next = current.filterNot { it.id == incoming.id } + incoming
+        return sortMessages(next)
+    }
+
+    private fun sortMessages(messages: List<MessageDto>): List<MessageDto> =
+        messages.sortedWith(compareBy<MessageDto> { it.createdAt ?: "" }.thenBy { it.id })
+}

@@ -1,4 +1,5 @@
 import { getDb } from '../db.js';
+import { previewStore } from '../modules/im-preview/preview-store.js';
 
 export class UserAccessError extends Error {
   constructor(message: string) {
@@ -8,7 +9,19 @@ export class UserAccessError extends Error {
 }
 
 export async function resolveUserAccessByPhone(phone: string) {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+  if (!process.env.DATABASE_URL) {
+    try {
+      return previewStore.resolveUserAccess(phone);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'user not found') {
+        throw new UserAccessError('user not found');
+      }
+      if (error instanceof Error && error.message === 'user banned') {
+        throw new UserAccessError('user banned');
+      }
+      throw error;
+    }
+  }
   const db = getDb();
   const [rows] = await db.execute<any[]>(
     `SELECT id, status
@@ -31,4 +44,3 @@ export async function resolveUserAccessByPhone(phone: string) {
     status: row.status || 'ACTIVE'
   };
 }
-
