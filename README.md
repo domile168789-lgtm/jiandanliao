@@ -25,6 +25,97 @@
 - 后台用户列表、封禁、举报、公告、审计
 - Nginx + API + WS + MySQL + Redis + MinIO 的部署基线
 
+## 用户端功能
+
+当前仓库里的用户端覆盖 `Web/H5`、`Android`、`iOS` 三端，已规划并接入以下核心功能：
+
+### 账号与启动
+
+- 账号注册
+- 密码登录
+- 登录态恢复
+- 封禁状态提示
+- 下载引导与版本提示
+
+### 消息主链路
+
+- 会话列表
+- 单聊
+- 群聊
+- 文本消息
+- 图片消息
+- 送达与已读回执
+- 系统通知会话
+
+### 联系人与群
+
+- 联系人列表
+- 搜索与发起单聊
+- 创建群
+- 群成员查看
+- 群公告查看
+- 举报用户 / 举报群 / 举报消息
+
+### 发现与运营入口
+
+- 发现页
+- 活动中心入口
+- 系统公告入口
+- 邀请推广入口
+- 钱包 / 收益 / 代理入口
+
+### 我的与安全
+
+- 个人资料页
+- 钱包页
+- 收益页
+- 代理页
+- 系统通知页
+- 设置页
+- 安全页
+- 退出登录
+
+### 当前用户端说明
+
+- `Web/H5`：当前是最完整、最方便直接预览的一端
+- `Android`：页面结构与数据入口已补齐，最终 APK 构建仍需完整 Android 构建环境验证
+- `iOS`：页面结构与轻量接口接线已补齐，最终编译仍需 macOS + Xcode 环境验证
+
+## 管理后台功能
+
+当前仓库只保留一个统一管理后台：`apps/admin-desktop`
+
+### 后台模块
+
+- 仪表盘
+- 用户管理
+- 群组管理
+- 群主管理
+- 举报审核
+- 公告发布
+- 审计记录
+- 财务报表
+- 代理管理
+- 活动管理
+- 品牌配置
+
+### 已支持的后台能力
+
+- 用户列表查询
+- 用户封禁与状态处置
+- 举报查看与处理
+- 公告发布并下发系统通知
+- 活动创建
+- 仪表盘关键指标展示
+- 后台品牌与展示信息配置
+
+### 当前后台说明
+
+- `admin-desktop` 的 React Renderer 同时用于服务器后台页面预览
+- Electron 壳用于后续 Windows 桌面后台打包
+- 群组、群主管理、财务、代理等页面已接入统一后台导航
+- 部分页面仍混合真实数据、推导数据和演示态提示，后续会继续收口到完整真实接口
+
 ## 仓库结构
 
 ```text
@@ -106,6 +197,8 @@ Android 模拟器默认入口：
 
 - [阶段 1 并行联调与部署设计](docs/superpowers/specs/2026-07-29-jianliao-phase1-parallel-e2e-design.md)
 - [阶段 1 并行联调与部署实施计划](docs/superpowers/plans/2026-07-29-jianliao-phase1-parallel-e2e.md)
+- [柬单聊全端交付设计](docs/superpowers/specs/2026-07-30-jiandanliao-full-delivery-design.md)
+- [柬单聊全端交付实施计划](docs/superpowers/plans/2026-07-30-jiandanliao-full-delivery.md)
 
 ## 宝塔终端一键部署
 
@@ -117,8 +210,8 @@ Android 模拟器默认入口：
 
 ```bash
 cd /opt
-git clone https://github.com/domile168789-lgtm/jianliao.git
-cd /opt/jianliao
+git clone https://github.com/domile168789-lgtm/jiandanliao.git
+cd /opt/jiandanliao
 cp infra/compose/.env.example infra/compose/.env
 docker compose --env-file infra/compose/.env -f infra/compose/docker-compose.yml up -d --build
 ```
@@ -162,6 +255,6 @@ docker compose --env-file infra/compose/.env -f infra/compose/docker-compose.yml
 
 ## 备注
 
-当前仓库默认使用 `master` 分支，并已同步到：
+当前仓库默认主线分支为 `main`，并已同步到：
 
-- GitHub: `https://github.com/domile168789-lgtm/jianliao`
+- GitHub: `https://github.com/domile168789-lgtm/jiandanliao`
