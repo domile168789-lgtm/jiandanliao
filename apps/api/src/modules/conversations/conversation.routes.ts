@@ -53,6 +53,26 @@ export async function conversationRoutes(app: FastifyInstance) {
     }
   });
 
+  app.get('/conversations/:id/members', async (request, reply) => {
+    if (!request.user?.phone) return reply.code(401).send({ code: 'UNAUTHORIZED' });
+    const { id } = request.params as { id: string };
+
+    try {
+      return await service.listConversationMembers({
+        conversationId: id,
+        phone: request.user.phone
+      });
+    } catch (error) {
+      if (isForbiddenConversationAccess(error)) {
+        return reply.code(403).send({ code: 'FORBIDDEN' });
+      }
+      if (isGroupOnlyOperation(error)) {
+        return reply.code(400).send({ code: 'BAD_REQUEST', message: (error as Error).message });
+      }
+      throw error;
+    }
+  });
+
   app.post('/conversations/:id/invite', async (request, reply) => {
     if (!request.user?.phone) return reply.code(401).send({ code: 'UNAUTHORIZED' });
     const { id } = request.params as { id: string };
@@ -71,7 +91,7 @@ export async function conversationRoutes(app: FastifyInstance) {
       if (isForbiddenConversationAccess(error) || isGroupOwnerRequired(error)) {
         return reply.code(403).send({ code: 'FORBIDDEN' });
       }
-      if (isGroupOnlyOperation(error) || isBadRequest(error)) {
+      if (isGroupOnlyOperation(error) || isBadRequest(error) || isUserNotFound(error)) {
         return reply.code(400).send({ code: 'BAD_REQUEST', message: (error as Error).message });
       }
       throw error;

@@ -133,7 +133,7 @@ export default function MainShell() {
             key={row.id}
             className="conversation-link"
             to={`/h5/chat/${row.id}`}
-            state={{ conversationTitle: row.title || row.type }}
+            state={{ conversationTitle: row.title || row.type, conversationType: row.type }}
           >
             <article className="conversation-row">
               <div className={`conversation-avatar conversation-avatar-${row.type.toLowerCase()}`} aria-hidden="true">

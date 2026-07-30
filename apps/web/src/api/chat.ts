@@ -39,6 +39,15 @@ export type SelectableContactRow = {
   type: PreviewContact['type'];
 };
 
+export type GroupMemberRow = {
+  userId: string;
+  name: string;
+  phone: string;
+  role: 'OWNER' | 'MEMBER';
+  isSelf: boolean;
+  joinedAt?: string | null;
+};
+
 type PreviewStore = {
   conversations: ConversationRow[];
   messages: Record<string, MessageRow[]>;
@@ -425,6 +434,27 @@ const normalizeMessage = (payload: unknown): MessageRow | null => {
   };
 };
 
+const normalizeGroupMember = (payload: unknown): GroupMemberRow | null => {
+  if (!payload || typeof payload !== 'object') return null;
+
+  const row = payload as Record<string, unknown>;
+  const userId = typeof row.userId === 'string' ? row.userId : '';
+  const name = typeof row.name === 'string' ? row.name : '';
+  const phone = typeof row.phone === 'string' ? row.phone : '';
+  if (!userId || !phone || !name) {
+    return null;
+  }
+
+  return {
+    userId,
+    name,
+    phone,
+    role: row.role === 'OWNER' ? 'OWNER' : 'MEMBER',
+    isSelf: Boolean(row.isSelf),
+    joinedAt: typeof row.joinedAt === 'string' ? row.joinedAt : null
+  };
+};
+
 const resolveSocketUrl = () => {
   if (typeof window === 'undefined') return '';
   const envUrl = import.meta.env.VITE_WS_BASE_URL;
@@ -734,6 +764,43 @@ export async function loadSelectableContacts(): Promise<SelectableContactRow[]> 
     title: item.title,
     type: item.type
   }));
+}
+
+export async function listConversationMembers(
+  conversationId: string,
+  fetcher: typeof fetch = fetch
+): Promise<GroupMemberRow[]> {
+  const payload = await apiGet<unknown>(`/api/conversations/${encodeURIComponent(conversationId)}/members`, fetcher);
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload
+    .map((item) => normalizeGroupMember(item))
+    .filter((item): item is GroupMemberRow => item !== null);
+}
+
+export async function inviteConversationMembers(
+  conversationId: string,
+  memberPhones: string[],
+  fetcher: typeof fetch = fetch
+) {
+  return await apiPost<{ id: string; invitedCount: number }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/invite`,
+    { memberPhones },
+    fetcher
+  );
+}
+
+export async function leaveConversationGroup(
+  conversationId: string,
+  fetcher: typeof fetch = fetch
+) {
+  return await apiPost<{ id: string; left: true }>(
+    `/api/conversations/${encodeURIComponent(conversationId)}/leave`,
+    {},
+    fetcher
+  );
 }
 
 export function subscribeRealtimeMessages(

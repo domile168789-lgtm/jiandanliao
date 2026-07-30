@@ -56,7 +56,8 @@ export default function NewGroupConfirmPage() {
       navigate(`/h5/chat/${created.id}`, {
         replace: true,
         state: {
-          conversationTitle: created.title || title.trim() || '新的群聊'
+          conversationTitle: created.title || title.trim() || '新的群聊',
+          conversationType: created.type || 'GROUP'
         }
       });
     } catch {

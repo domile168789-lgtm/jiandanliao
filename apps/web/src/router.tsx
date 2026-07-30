@@ -13,6 +13,7 @@ import AgentPage from './pages/AgentPage';
 import CardsPage from './pages/CardsPage';
 import ChannelsPage from './pages/ChannelsPage';
 import ChatPage from './pages/ChatPage';
+import ChatSettingsPage from './pages/ChatSettingsPage';
 import ContactProfilePage from './pages/ContactProfilePage';
 import ContactsPage from './pages/ContactsPage';
 import DiscoverPage from './pages/DiscoverPage';
@@ -224,6 +225,15 @@ export default function AppRouter() {
         element={
           <RequireAuth>
             <ChatPage />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/h5/chat/:conversationId/settings"
+        element={
+          <RequireAuth>
+            <ChatSettingsPage />
           </RequireAuth>
         }
       />

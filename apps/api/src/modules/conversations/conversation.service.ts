@@ -170,12 +170,51 @@ export class ConversationService {
     };
   }
 
+  async listConversationMembers(input: { conversationId: string; phone: string }) {
+    if (!process.env.DATABASE_URL) {
+      return previewStore.listConversationMembers(input);
+    }
+
+    const member = await this.getMemberContext(input.conversationId, input.phone);
+    if (!member) {
+      throw new Error('forbidden conversation access');
+    }
+    if (member.type !== 'GROUP') {
+      throw new Error('group only operation');
+    }
+
+    const db = getDb();
+    const [rows] = await db.execute<any[]>(
+      `SELECT u.id AS userId,
+              u.phone,
+              COALESCE(NULLIF(u.nickname, ''), u.phone) AS name,
+              m.role,
+              m.joined_at AS joinedAt
+       FROM conversation_members m
+       JOIN users u ON u.id = m.user_id
+       WHERE m.conversation_id = ?
+       ORDER BY CASE WHEN m.role = 'OWNER' THEN 0 ELSE 1 END, m.joined_at ASC`,
+      [input.conversationId]
+    );
+
+    return rows.map((row) => ({
+      userId: row.userId,
+      phone: row.phone,
+      name: row.name,
+      role: row.role,
+      joinedAt: row.joinedAt,
+      isSelf: row.userId === member.userId
+    }));
+  }
+
   async inviteGroupMembersByPhones(input: {
     conversationId: string;
     operatorPhone: string;
     memberPhones: string[];
   }) {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+    if (!process.env.DATABASE_URL) {
+      return previewStore.inviteGroupMembersByPhones(input);
+    }
     const db = getDb();
     const operator = await this.getMemberContext(input.conversationId, input.operatorPhone);
 
@@ -210,7 +249,9 @@ export class ConversationService {
   }
 
   async leaveGroupByPhone(input: { conversationId: string; phone: string }) {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+    if (!process.env.DATABASE_URL) {
+      return previewStore.leaveGroupByPhone(input);
+    }
     const db = getDb();
     const member = await this.getMemberContext(input.conversationId, input.phone);
 
@@ -225,6 +266,26 @@ export class ConversationService {
       input.conversationId,
       member.userId
     ]);
+
+    if (member.role === 'OWNER') {
+      const [remainingRows] = await db.execute<any[]>(
+        `SELECT user_id AS userId
+         FROM conversation_members
+         WHERE conversation_id = ?
+         ORDER BY joined_at ASC
+         LIMIT 1`,
+        [input.conversationId]
+      );
+      const nextOwnerId = remainingRows?.[0]?.userId as string | undefined;
+      if (nextOwnerId) {
+        await db.execute(
+          `UPDATE conversation_members
+           SET role = 'OWNER'
+           WHERE conversation_id = ? AND user_id = ?`,
+          [input.conversationId, nextOwnerId]
+        );
+      }
+    }
     await db.execute(`UPDATE conversations SET updated_at = ? WHERE id = ?`, [new Date(), input.conversationId]);
 
     return {

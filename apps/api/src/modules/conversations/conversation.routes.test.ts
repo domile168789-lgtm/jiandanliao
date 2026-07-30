@@ -152,6 +152,84 @@ describe('conversationRoutes', () => {
     });
   });
 
+  it('lists group members in preview mode', async () => {
+    const app = await buildApp();
+    const token = signAccessToken({ sub: '855010100000', deviceId: 'ios-1' });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/conversations/preview-group-agency/members',
+      headers: { authorization: `Bearer ${token}` }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phone: '855010100000',
+          role: 'OWNER',
+          isSelf: true
+        }),
+        expect.objectContaining({
+          phone: '855010100002',
+          role: 'MEMBER'
+        })
+      ])
+    );
+  });
+
+  it('invites and removes group members in preview mode', async () => {
+    const app = await buildApp();
+    const ownerToken = signAccessToken({ sub: '855010100000', deviceId: 'ios-owner' });
+    const invited = registerPreviewUser('855010199999');
+
+    const inviteResponse = await app.inject({
+      method: 'POST',
+      url: '/api/conversations/preview-group-agency/invite',
+      headers: {
+        authorization: `Bearer ${ownerToken}`
+      },
+      payload: {
+        memberPhones: [invited.phone]
+      }
+    });
+
+    expect(inviteResponse.statusCode).toBe(200);
+    expect(inviteResponse.json()).toEqual({
+      id: 'preview-group-agency',
+      invitedCount: 1
+    });
+
+    const membersAfterInvite = await app.inject({
+      method: 'GET',
+      url: '/api/conversations/preview-group-agency/members',
+      headers: { authorization: `Bearer ${ownerToken}` }
+    });
+
+    expect(membersAfterInvite.statusCode).toBe(200);
+    expect(membersAfterInvite.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          phone: invited.phone
+        })
+      ])
+    );
+
+    const leaveResponse = await app.inject({
+      method: 'POST',
+      url: '/api/conversations/preview-group-agency/leave',
+      headers: {
+        authorization: `Bearer ${invited.accessToken}`
+      }
+    });
+
+    expect(leaveResponse.statusCode).toBe(200);
+    expect(leaveResponse.json()).toEqual({
+      id: 'preview-group-agency',
+      left: true
+    });
+  });
+
   it('rejects unauthenticated group invite and leave', async () => {
     const app = await buildApp();
 

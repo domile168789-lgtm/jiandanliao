@@ -57,6 +57,9 @@ const renderMessageBody = (row: MessageRow) => {
 export default function ChatPage() {
   const { conversationId = 'demo-conversation' } = useParams();
   const location = useLocation();
+  const locationState = location.state as
+    | { conversationTitle?: string; conversationType?: string }
+    | null;
   const [messages, setMessages] = React.useState<MessageRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [draft, setDraft] = React.useState('');
@@ -128,7 +131,7 @@ export default function ChatPage() {
   }, [conversationId, refresh, syncReadState]);
 
   const conversationTitle = React.useMemo(() => {
-    const locationTitle = (location.state as { conversationTitle?: string } | null)?.conversationTitle;
+    const locationTitle = locationState?.conversationTitle;
     const latestSystem = messages.find((item) => item.type === 'SYSTEM');
     if (conversationId === 'demo-system') return '系统通知';
     if (conversationId === 'demo-business') return '商务对接';
@@ -142,7 +145,13 @@ export default function ChatPage() {
     if (latestSystem && typeof latestSystem.body.title === 'string') return latestSystem.body.title;
     if (typeof locationTitle === 'string' && locationTitle.trim()) return locationTitle.trim();
     return '聊天';
-  }, [conversationId, location.state, messages]);
+  }, [conversationId, locationState, messages]);
+
+  const isGroupConversation =
+    locationState?.conversationType === 'GROUP' ||
+    conversationId === 'demo-agency' ||
+    conversationId === 'preview-group-agency' ||
+    conversationId.startsWith('preview-group-');
 
   const handleSend = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -250,9 +259,20 @@ export default function ChatPage() {
           <h1>{conversationTitle}</h1>
           <p>会话 ID：{conversationId}</p>
         </div>
-        <Link className="mini-link" to="/h5/messages">
-          返回消息
-        </Link>
+        <div className="chat-header-actions">
+          {isGroupConversation ? (
+            <Link
+              className="mini-link"
+              to={`/h5/chat/${conversationId}/settings`}
+              state={{ conversationTitle, conversationType: 'GROUP' }}
+            >
+              群设置
+            </Link>
+          ) : null}
+          <Link className="mini-link" to="/h5/messages">
+            返回消息
+          </Link>
+        </div>
       </header>
 
       <section className="chat-feed" aria-label="聊天消息">

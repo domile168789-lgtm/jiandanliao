@@ -573,6 +573,26 @@ const toConversationRow = (conversation: PreviewConversation, currentUserId: str
   isMuted: false
 });
 
+const mapConversationMembers = (conversation: PreviewConversation, currentUserId: string) =>
+  conversation.members
+    .map((memberId) => {
+      const user = getUserById(memberId);
+      if (!user) {
+        return null;
+      }
+      return {
+        userId: user.id,
+        name: user.nickname,
+        phone: user.phone,
+        role: conversation.ownerUserId === user.id ? ('OWNER' as const) : ('MEMBER' as const),
+        isSelf: user.id === currentUserId
+      };
+    })
+    .filter(
+      (value): value is { userId: string; name: string; phone: string; role: 'OWNER' | 'MEMBER'; isSelf: boolean } =>
+        Boolean(value)
+    );
+
 const ensureMember = (conversationId: string, userId: string) => {
   const conversation = state.conversations.find((item) => item.id === conversationId);
   if (!conversation || !conversation.members.includes(userId)) {
@@ -766,6 +786,82 @@ export const previewStore = {
     sortConversations(state.conversations);
 
     return toConversationRow(conversation, owner.id);
+  },
+
+  listConversationMembers(input: { conversationId: string; phone: string }) {
+    const access = this.resolveUserAccess(input.phone);
+    const conversation = ensureMember(input.conversationId, access.userId);
+    if (conversation.type !== 'GROUP') {
+      throw new Error('group only operation');
+    }
+    return mapConversationMembers(conversation, access.userId);
+  },
+
+  inviteGroupMembersByPhones(input: {
+    conversationId: string;
+    operatorPhone: string;
+    memberPhones: string[];
+  }) {
+    const access = this.resolveUserAccess(input.operatorPhone);
+    const conversation = ensureMember(input.conversationId, access.userId);
+
+    if (conversation.type !== 'GROUP') {
+      throw new Error('group only operation');
+    }
+    if (conversation.ownerUserId !== access.userId) {
+      throw new Error('group owner required');
+    }
+
+    const normalizedPhones = Array.from(new Set(input.memberPhones.map(normalizePhone).filter(Boolean)));
+    const memberIds = normalizedPhones
+      .map((phone) => {
+        const user = getUserByPhone(phone);
+        if (!user) {
+          throw new Error(`user not found: ${phone}`);
+        }
+        return user.id;
+      })
+      .filter((userId) => userId !== access.userId);
+
+    if (!memberIds.length) {
+      throw new Error('group requires at least one member');
+    }
+
+    let invitedCount = 0;
+    memberIds.forEach((userId) => {
+      if (!conversation.members.includes(userId)) {
+        conversation.members.push(userId);
+        invitedCount += 1;
+      }
+    });
+    conversation.updatedAt = new Date().toISOString();
+    sortConversations(state.conversations);
+
+    return {
+      id: input.conversationId,
+      invitedCount
+    };
+  },
+
+  leaveGroupByPhone(input: { conversationId: string; phone: string }) {
+    const access = this.resolveUserAccess(input.phone);
+    const conversation = ensureMember(input.conversationId, access.userId);
+
+    if (conversation.type !== 'GROUP') {
+      throw new Error('group only operation');
+    }
+
+    conversation.members = conversation.members.filter((memberId) => memberId !== access.userId);
+    if (conversation.ownerUserId === access.userId) {
+      conversation.ownerUserId = conversation.members[0] || null;
+    }
+    conversation.updatedAt = new Date().toISOString();
+    sortConversations(state.conversations);
+
+    return {
+      id: input.conversationId,
+      left: true
+    };
   },
 
   listMessages(input: { conversationId: string; phone: string; limit?: number }) {

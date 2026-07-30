@@ -64,8 +64,12 @@ export default function GroupChatsPage() {
         {!loading ? (
           <section className="stack-panel" aria-label="群聊列表">
             {rows.map((item) => (
-              <Link key={item.id} className="detail-row-link" to={`/h5/chat/${item.id}`}>
-                <article className="detail-row-card">
+              <article key={item.id} className="detail-row-card detail-row-card-stack">
+                <Link
+                  className="detail-row-link"
+                  to={`/h5/chat/${item.id}`}
+                  state={{ conversationTitle: item.title || '未命名群聊', conversationType: 'GROUP' }}
+                >
                   <div className="detail-row-main">
                     <div className="detail-avatar is-group" aria-hidden="true">
                       群
@@ -76,8 +80,24 @@ export default function GroupChatsPage() {
                       <p>{item.lastMessage || '进入群聊后开始发送消息。'}</p>
                     </div>
                   </div>
-                </article>
-              </Link>
+                </Link>
+                <div className="detail-row-actions">
+                  <Link
+                    className="secondary-button"
+                    to={`/h5/chat/${item.id}`}
+                    state={{ conversationTitle: item.title || '未命名群聊', conversationType: 'GROUP' }}
+                  >
+                    进入聊天
+                  </Link>
+                  <Link
+                    className="secondary-button"
+                    to={`/h5/chat/${item.id}/settings`}
+                    state={{ conversationTitle: item.title || '未命名群聊', conversationType: 'GROUP' }}
+                  >
+                    群管理
+                  </Link>
+                </div>
+              </article>
             ))}
           </section>
         ) : null}

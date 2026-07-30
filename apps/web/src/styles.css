@@ -14,7 +14,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -532,6 +533,16 @@ input {
   background: #fff;
 }
 
+.search-box select {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #d7e0ee;
+  background: #fff;
+  color: #0f172a;
+}
+
 .conversation-state {
   margin: 0;
   padding: 24px 12px;
@@ -614,9 +625,32 @@ input {
   padding: 16px;
 }
 
+.detail-row-card-stack {
+  display: grid;
+  gap: 0;
+  padding: 0;
+}
+
 .detail-row-link + .detail-row-link,
 .detail-row-card + .detail-row-card {
   border-top: 1px solid #eef2f7;
+}
+
+.detail-row-card-stack .detail-row-link {
+  display: block;
+  padding: 16px;
+}
+
+.detail-row-actions,
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.detail-row-actions {
+  padding: 0 16px 16px;
 }
 
 .detail-row-main,
@@ -1163,6 +1197,80 @@ input {
 .settings-action {
   width: 100%;
   justify-content: center;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.member-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.member-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(203, 213, 225, 0.72);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.member-card-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.member-card-main span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.member-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.member-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.member-badge.is-owner {
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
+}
+
+.member-badge.is-member {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+
+.member-badge.is-self {
+  background: rgba(15, 23, 42, 0.08);
+  color: #334155;
+}
+
+.danger-button {
+  border-color: rgba(239, 68, 68, 0.18);
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .form-error {

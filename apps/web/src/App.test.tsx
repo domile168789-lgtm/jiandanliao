@@ -22,10 +22,35 @@ const brandingResponse = {
   }
 };
 
+const createGroupMembers = () => [
+  {
+    userId: 'user-demo-1',
+    name: '演示用户',
+    phone: '855010100000',
+    role: 'OWNER',
+    isSelf: true
+  },
+  {
+    userId: 'user-demo-2',
+    name: '商务对接',
+    phone: '855010100002',
+    role: 'MEMBER',
+    isSelf: false
+  },
+  {
+    userId: 'user-demo-3',
+    name: '渠道伙伴群',
+    phone: '855010100003',
+    role: 'MEMBER',
+    isSelf: false
+  }
+] as const;
+
 describe('App route entry', () => {
   beforeEach(() => {
     window.localStorage.clear();
     cleanup();
+    let groupMembers = createGroupMembers().map((item) => ({ ...item }));
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -250,6 +275,53 @@ describe('App route entry', () => {
               title: '测试群聊',
               lastMessage: null,
               updatedAt: new Date().toISOString()
+            })
+          });
+        }
+
+        if (url.includes('/api/conversations/preview-group-agency/members') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => groupMembers
+          });
+        }
+
+        if (url.includes('/api/conversations/preview-group-agency/invite') && method === 'POST') {
+          const payload = JSON.parse(String(init?.body || '{}')) as { memberPhones?: string[] };
+          const additions = [
+            { phone: '855010100004', name: '安全专员' },
+            { phone: '855010188001', name: '阿杰商务' },
+            { phone: '855010188002', name: '运营小晴' },
+            { phone: '855010188003', name: '风控专员 May' }
+          ];
+          (payload.memberPhones || []).forEach((phone) => {
+            if (groupMembers.some((item) => item.phone === phone)) return;
+            const matched = additions.find((item) => item.phone === phone);
+            if (!matched) return;
+            groupMembers.push({
+              userId: `member-${phone}`,
+              name: matched.name,
+              phone,
+              role: 'MEMBER',
+              isSelf: false
+            });
+          });
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              id: 'preview-group-agency',
+              invitedCount: (payload.memberPhones || []).length
+            })
+          });
+        }
+
+        if (url.includes('/api/conversations/preview-group-agency/leave') && method === 'POST') {
+          groupMembers = groupMembers.filter((item) => item.phone !== '855010100000');
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              id: 'preview-group-agency',
+              left: true
             })
           });
         }
@@ -866,6 +938,22 @@ describe('App route entry', () => {
     fireEvent.click(screen.getByRole('button', { name: '完成' }));
 
     expect(await screen.findByRole('heading', { level: 1, name: '测试群聊' })).toBeInTheDocument();
+  });
+
+  it('opens chat settings page and manages group members', async () => {
+    renderAt('/h5/chat/preview-group-agency/settings', { token: 'demo-token' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: '群聊设置' })).toBeInTheDocument();
+    expect(screen.getByText('商务对接')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('邀请成员'), {
+      target: { value: '855010100004' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: '邀请成员' }));
+    expect(await screen.findByText('安全专员')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '退出群聊' }));
+    expect(await screen.findByRole('heading', { level: 1, name: '消息' })).toBeInTheDocument();
   });
 
   it('renders all extended client sections when authenticated', async () => {
