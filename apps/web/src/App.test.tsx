@@ -123,6 +123,137 @@ describe('App route entry', () => {
     expect(await screen.findByRole('heading', { level: 1, name: '我的' })).toBeInTheDocument();
   });
 
+  it('keeps demo conversations visible when preview auth expires', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method || 'GET';
+
+        if (url.includes('/api/auth/login/password') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              accessToken: 'preview-token'
+            })
+          });
+        }
+
+        if (url.includes('/api/auth/register') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              accessToken: 'preview-token'
+            })
+          });
+        }
+
+        if (url.includes('/api/conversations')) {
+          return Promise.resolve({
+            ok: false,
+            status: 401
+          });
+        }
+
+        if (url.includes('/api/messages')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => []
+          });
+        }
+
+        const row = url.includes('group=mobile') ? brandingResponse.mobile : brandingResponse.pc;
+
+        return Promise.resolve({
+          ok: true,
+          json: async () => row
+        });
+      })
+    );
+
+    renderAt('/h5/messages?preview=demo');
+
+    expect(await screen.findByRole('link', { name: /系统通知/ })).toBeInTheDocument();
+    expect(
+      screen.getByText('会话列表接口暂不可用，当前展示降级 IM 演示会话。')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('登录状态已失效，请重新登录')).not.toBeInTheDocument();
+  });
+
+  it('opens the contacts service pages', async () => {
+    const routes = [
+      { path: '/h5/contacts/friends', heading: '新的朋友' },
+      { path: '/h5/contacts/groups', heading: '群聊' },
+      { path: '/h5/contacts/tags', heading: '标签' },
+      { path: '/h5/contacts/official-accounts', heading: '公众号' }
+    ];
+
+    for (const [index, route] of routes.entries()) {
+      if (index > 0) cleanup();
+      renderAt(route.path, { token: 'demo-token' });
+      expect(await screen.findByRole('heading', { level: 1, name: route.heading })).toBeInTheDocument();
+    }
+  });
+
+  it('renders wechat-style contacts entry rows', async () => {
+    renderAt('/h5/contacts', { token: 'demo-token' });
+
+    expect(await screen.findByRole('link', { name: /新的朋友/ })).toHaveAttribute('href', '/h5/contacts/friends');
+    expect(screen.getByRole('link', { name: /群聊/ })).toHaveAttribute('href', '/h5/contacts/groups');
+    expect(screen.getByRole('link', { name: /标签/ })).toHaveAttribute('href', '/h5/contacts/tags');
+    expect(screen.getByRole('link', { name: /公众号/ })).toHaveAttribute(
+      'href',
+      '/h5/contacts/official-accounts'
+    );
+  });
+
+  it('opens the discover service pages', async () => {
+    const routes = [
+      { path: '/h5/discover/moments', heading: '朋友圈' },
+      { path: '/h5/discover/scan', heading: '扫一扫' },
+      { path: '/h5/discover/channels', heading: '看一看' },
+      { path: '/h5/discover/search', heading: '搜一搜' }
+    ];
+
+    for (const [index, route] of routes.entries()) {
+      if (index > 0) cleanup();
+      renderAt(route.path, { token: 'demo-token' });
+      expect(await screen.findByRole('heading', { level: 1, name: route.heading })).toBeInTheDocument();
+    }
+  });
+
+  it('renders wechat-style discover rows', async () => {
+    renderAt('/h5/discover', { token: 'demo-token' });
+
+    expect(await screen.findByRole('link', { name: /朋友圈/ })).toHaveAttribute('href', '/h5/discover/moments');
+    expect(screen.getByRole('link', { name: /扫一扫/ })).toHaveAttribute('href', '/h5/discover/scan');
+    expect(screen.getByRole('link', { name: /看一看/ })).toHaveAttribute('href', '/h5/discover/channels');
+    expect(screen.getByRole('link', { name: /搜一搜/ })).toHaveAttribute('href', '/h5/discover/search');
+  });
+
+  it('opens the me service pages', async () => {
+    const routes = [
+      { path: '/h5/me/services', heading: '服务' },
+      { path: '/h5/me/favorites', heading: '收藏' },
+      { path: '/h5/me/cards', heading: '卡包' },
+      { path: '/h5/me/stickers', heading: '表情' }
+    ];
+
+    for (const [index, route] of routes.entries()) {
+      if (index > 0) cleanup();
+      renderAt(route.path, { token: 'demo-token' });
+      expect(await screen.findByRole('heading', { level: 1, name: route.heading })).toBeInTheDocument();
+    }
+  });
+
+  it('renders wechat-style me sections', async () => {
+    renderAt('/h5/me', { token: 'demo-token' });
+
+    expect(await screen.findByRole('link', { name: /服务/ })).toHaveAttribute('href', '/h5/me/services');
+    expect(screen.getByRole('link', { name: /卡包/ })).toHaveAttribute('href', '/h5/me/cards');
+    expect(screen.getByRole('link', { name: /设置/ })).toHaveAttribute('href', '/h5/settings');
+  });
+
   it('opens the new group flow route', async () => {
     renderAt('/h5/group/new', { token: 'demo-token' });
     expect(await screen.findByRole('heading', { level: 1, name: '选择联系人' })).toBeInTheDocument();

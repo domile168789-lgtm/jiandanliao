@@ -2,22 +2,40 @@ import React from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, apiPost } from './api/client';
 import DownloadPage from './components/DownloadPage';
-import { clearAccessToken, hasAccessToken, setAccessToken } from './state/session';
+import {
+  clearAccessToken,
+  hasAccessToken,
+  hasPreviewSession,
+  setAccessToken,
+  setPreviewSessionEnabled
+} from './state/session';
 import AgentPage from './pages/AgentPage';
+import CardsPage from './pages/CardsPage';
+import ChannelsPage from './pages/ChannelsPage';
 import ChatPage from './pages/ChatPage';
 import ContactsPage from './pages/ContactsPage';
 import DiscoverPage from './pages/DiscoverPage';
 import EarningsPage from './pages/EarningsPage';
+import FavoritesPage from './pages/FavoritesPage';
+import FriendsRequestsPage from './pages/FriendsRequestsPage';
+import GroupChatsPage from './pages/GroupChatsPage';
 import LoginPage from './pages/LoginPage';
 import MePage from './pages/MePage';
 import MessagesPage from './pages/MessagesPage';
+import MomentsPage from './pages/MomentsPage';
 import NewGroupConfirmPage from './pages/NewGroupConfirmPage';
 import NewGroupPage from './pages/NewGroupPage';
+import OfficialAccountsPage from './pages/OfficialAccountsPage';
 import ProfilePage from './pages/ProfilePage';
 import RegisterEntryPage from './pages/RegisterEntryPage';
+import ScanPage from './pages/ScanPage';
+import SearchHubPage from './pages/SearchHubPage';
 import SecurityPage from './pages/SecurityPage';
 import SettingsPage from './pages/SettingsPage';
+import ServicesPage from './pages/ServicesPage';
+import StickersPage from './pages/StickersPage';
 import SystemNoticePage from './pages/SystemNoticePage';
+import TagsPage from './pages/TagsPage';
 import TabShell from './pages/TabShell';
 import WalletPage from './pages/WalletPage';
 
@@ -26,6 +44,18 @@ export const appRoutes = [
   { path: '/contacts', element: <ContactsPage /> },
   { path: '/discover', element: <DiscoverPage /> },
   { path: '/me', element: <MePage /> },
+  { path: '/contacts/friends', element: <FriendsRequestsPage /> },
+  { path: '/contacts/groups', element: <GroupChatsPage /> },
+  { path: '/contacts/tags', element: <TagsPage /> },
+  { path: '/contacts/official-accounts', element: <OfficialAccountsPage /> },
+  { path: '/discover/moments', element: <MomentsPage /> },
+  { path: '/discover/scan', element: <ScanPage /> },
+  { path: '/discover/channels', element: <ChannelsPage /> },
+  { path: '/discover/search', element: <SearchHubPage /> },
+  { path: '/me/services', element: <ServicesPage /> },
+  { path: '/me/favorites', element: <FavoritesPage /> },
+  { path: '/me/cards', element: <CardsPage /> },
+  { path: '/me/stickers', element: <StickersPage /> },
   { path: '/system-notice', element: <SystemNoticePage /> },
   { path: '/wallet', element: <WalletPage /> },
   { path: '/earnings', element: <EarningsPage /> },
@@ -82,6 +112,7 @@ function PreviewSessionBootstrap({ children }: { children: React.ReactNode }) {
           setErrorMessage('预览登录未返回有效凭证');
           return;
         }
+        setPreviewSessionEnabled(true);
         setAccessToken(payload.accessToken);
         setReady(true);
         navigate(location.pathname, { replace: true });
@@ -114,11 +145,12 @@ function PreviewSessionBootstrap({ children }: { children: React.ReactNode }) {
 }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const search = typeof window === 'undefined' ? '' : window.location.search;
+  const location = useLocation();
+  const search = location.search;
   if (hasAccessToken()) {
     return <>{children}</>;
   }
-  if (isPreviewMode(search)) {
+  if (isPreviewMode(search) || hasPreviewSession()) {
     return <PreviewSessionBootstrap>{children}</PreviewSessionBootstrap>;
   }
   return <Navigate to={`/h5/login${search}`} replace />;

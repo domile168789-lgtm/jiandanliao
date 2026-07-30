@@ -33,6 +33,7 @@ describe('MainShell', () => {
     );
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('消息');
+    expect(screen.queryByText('系统会话、单聊与群聊入口统一收口到这里。')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '打开快捷菜单' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: /商务对接/ })).toHaveAttribute(
       'href',
@@ -40,7 +41,7 @@ describe('MainShell', () => {
     );
   });
 
-  it('opens the plus menu and exposes 发起群聊', async () => {
+  it('shows all plus menu entries', async () => {
     render(
       <MemoryRouter>
         <MainShell />
@@ -49,8 +50,12 @@ describe('MainShell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '打开快捷菜单' }));
     expect(await screen.findByRole('link', { name: '发起群聊' })).toHaveAttribute('href', '/h5/group/new');
+    expect(screen.getByRole('link', { name: '添加朋友' })).toHaveAttribute('href', '/h5/contacts/friends');
+    expect(screen.getByRole('link', { name: '扫一扫' })).toHaveAttribute('href', '/h5/discover/scan');
+    expect(screen.getByRole('link', { name: '收付款' })).toHaveAttribute('href', '/h5/wallet');
 
     fireEvent.click(screen.getByRole('button', { name: '打开快捷菜单' }));
     expect(screen.queryByRole('link', { name: '发起群聊' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '添加朋友' })).not.toBeInTheDocument();
   });
 });

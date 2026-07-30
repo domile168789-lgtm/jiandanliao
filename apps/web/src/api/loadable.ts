@@ -1,4 +1,5 @@
 import { ApiError } from './client';
+import { hasPreviewSession } from '../state/session';
 
 export type DataSource = 'live' | 'demo';
 
@@ -38,7 +39,7 @@ export async function withDemoFallback<T>(
       source: 'live'
     };
   } catch (error) {
-    if (isAuthError(error)) {
+    if (isAuthError(error) && !hasPreviewSession()) {
       throw error;
     }
 

@@ -8,6 +8,13 @@ import {
 import { getErrorMessage } from '../api/loadable';
 import DataModeNotice from './DataModeNotice';
 
+const plusMenuItems = [
+  { label: '发起群聊', to: '/h5/group/new', icon: '群' },
+  { label: '添加朋友', to: '/h5/contacts/friends', icon: '友' },
+  { label: '扫一扫', to: '/h5/discover/scan', icon: '扫' },
+  { label: '收付款', to: '/h5/wallet', icon: '付' }
+] as const;
+
 export default function MainShell() {
   const [rows, setRows] = React.useState<ConversationRow[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -59,10 +66,9 @@ export default function MainShell() {
 
   return (
     <section className="h5-page">
-      <header className="top-bar top-bar-split">
-        <div>
+      <header className="top-bar top-bar-split top-bar-compact">
+        <div className="top-bar-title-only">
           <h1>消息</h1>
-          <p>系统会话、单聊与群聊入口统一收口到这里。</p>
         </div>
         <div className="top-bar-action">
           <button
@@ -86,19 +92,21 @@ export default function MainShell() {
                 onClick={() => setMenuOpen(false)}
               />
               <div id="messages-plus-menu" className="plus-menu" role="menu" aria-label="快捷菜单">
-                <Link className="plus-menu-item" to="/h5/group/new" onClick={() => setMenuOpen(false)}>
-                  <span className="plus-menu-item-icon" aria-hidden="true">
-                    群
-                  </span>
-                  <span>发起群聊</span>
-                </Link>
+                {plusMenuItems.map((item) => (
+                  <Link key={item.to} className="plus-menu-item" to={item.to} onClick={() => setMenuOpen(false)}>
+                    <span className="plus-menu-item-icon" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
               </div>
             </>
           ) : null}
         </div>
       </header>
 
-      <section className="placeholder-list" aria-label="消息列表">
+      <section className="placeholder-list conversation-list" aria-label="消息列表">
         {loading ? <p className="conversation-state">会话加载中...</p> : null}
         {!loading && errorMessage ? <div className="form-error">{errorMessage}</div> : null}
         {!loading && noticeMessage ? <DataModeNotice message={noticeMessage} /> : null}

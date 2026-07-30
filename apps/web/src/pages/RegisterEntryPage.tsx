@@ -4,7 +4,7 @@ import { getFallbackBranding, loadBranding, resolveBrandingGroup } from '../api/
 import { ApiError, apiPost } from '../api/client';
 import { getErrorMessage } from '../api/loadable';
 import RegisterPage from '../components/RegisterPage';
-import { hasAccessToken, setAccessToken } from '../state/session';
+import { hasAccessToken, setAccessToken, setPreviewSessionEnabled } from '../state/session';
 
 type RegisterResponse = {
   accessToken?: string;
@@ -71,6 +71,7 @@ export default function RegisterEntryPage() {
             setErrorMessage('注册接口未返回有效凭证');
             return;
           }
+          setPreviewSessionEnabled(false);
           setAccessToken(payload.accessToken);
           navigate('/h5/messages');
         } catch (error) {

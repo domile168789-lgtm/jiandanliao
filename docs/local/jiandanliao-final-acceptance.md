@@ -17,6 +17,8 @@
   - 完整四 Tab、聊天、发现、我的、钱包、收益、代理、系统通知、资料、安全页
   - 真实数据优先，非鉴权错误允许演示兜底并显式标注
   - 消息页已支持微信式 `+` 菜单中的 `发起群聊`，可完成选择联系人、填写群名、创建群聊并进入新群会话
+  - 消息、通讯录、发现、我的四个 Tab 首页已按微信式结构改版，新增入口均已接入真实能力或骨架页
+  - 预览模式下即使鉴权失效，消息页也会自动回落到本地 IM 演示会话，不再直接停留在登录失效提示
 - Android：
   - 我的/发现相关页统一加载、错误、空态、来源提示
   - 会话列表、聊天页、发送后刷新、自动 READ 回执、预览会话标题映射已对齐 IM 主链路
@@ -35,6 +37,10 @@
 - `pnpm --filter @jianliao/api test -- conversation.routes.test.ts`
 - `pnpm --filter @jianliao/web test`
 - `pnpm --filter @jianliao/web build`
+- 浏览器实测 `http://localhost:4174/h5/messages?preview=demo`
+  - 已验证消息、通讯录、发现、我的四个 Tab 首页可正常打开
+  - 已验证消息页展示微信式会话列表与 `+` 菜单入口
+  - 已验证我的页不再残留“登录状态已失效，请重新登录”错误提示
 - `pnpm --filter @jianliao/admin-desktop test`
 - `pnpm --filter @jianliao/admin-desktop build`
 - `pnpm exec vitest run tests/integration/*.test.ts`

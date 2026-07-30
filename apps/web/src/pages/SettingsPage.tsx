@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { clearAccessToken } from '../state/session';
+import { clearAccessToken, setPreviewSessionEnabled } from '../state/session';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -33,6 +33,7 @@ export default function SettingsPage() {
           type="button"
           onClick={() => {
             clearAccessToken();
+            setPreviewSessionEnabled(false);
             navigate('/h5/login');
           }}
         >

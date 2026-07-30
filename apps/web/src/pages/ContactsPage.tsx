@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createDirectConversation } from '../api/chat';
 import { getErrorMessage } from '../api/loadable';
 import DataModeNotice from '../components/DataModeNotice';
@@ -10,6 +10,13 @@ const contacts = [
   { id: 'c-3', name: '渠道伙伴', phone: '855010100003', tag: '代理' },
   { id: 'c-4', name: '安全专员', phone: '855010100004', tag: '安全' }
 ];
+
+const contactEntries = [
+  { title: '新的朋友', subtitle: '查看新的添加请求', to: '/h5/contacts/friends', icon: '友' },
+  { title: '群聊', subtitle: '查看和管理群会话', to: '/h5/contacts/groups', icon: '群' },
+  { title: '标签', subtitle: '管理联系人分组', to: '/h5/contacts/tags', icon: '标' },
+  { title: '公众号', subtitle: '查看服务账号', to: '/h5/contacts/official-accounts', icon: '号' }
+] as const;
 
 export default function ContactsPage() {
   const navigate = useNavigate();
@@ -46,8 +53,22 @@ export default function ContactsPage() {
         <h1>通讯录</h1>
       </header>
       <div className="placeholder-list contacts-page">
-        <DataModeNotice message="通讯录当前展示演示联系人列表，发起单聊仍会优先调用真实创建会话接口。" />
-        {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
+        <nav className="contacts-entry-stack" aria-label="通讯录服务入口">
+          {contactEntries.map((entry) => (
+            <Link key={entry.to} className="contacts-entry-link" to={entry.to}>
+              <span className="contacts-entry-icon" aria-hidden="true">
+                {entry.icon}
+              </span>
+              <span className="contacts-entry-copy">
+                <strong>{entry.title}</strong>
+                <span>{entry.subtitle}</span>
+              </span>
+              <span className="contacts-entry-arrow" aria-hidden="true">
+                &gt;
+              </span>
+            </Link>
+          ))}
+        </nav>
         <label className="search-box">
           <span>搜索联系人</span>
           <input
@@ -56,6 +77,8 @@ export default function ContactsPage() {
             placeholder="输入昵称、手机号或标签"
           />
         </label>
+        <DataModeNotice message="通讯录当前展示演示联系人列表，发起单聊仍会优先调用真实创建会话接口。" />
+        {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
 
         {rows.map((contact) => (
           <article key={contact.id} className="contact-card">

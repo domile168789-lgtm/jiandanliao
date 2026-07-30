@@ -4,7 +4,7 @@ import { getFallbackBranding, loadBranding, resolveBrandingGroup } from '../api/
 import { ApiError, apiPost } from '../api/client';
 import { getErrorMessage } from '../api/loadable';
 import AuthPage from '../components/AuthPage';
-import { hasAccessToken, setAccessToken } from '../state/session';
+import { hasAccessToken, setAccessToken, setPreviewSessionEnabled } from '../state/session';
 
 type AuthResponse = {
   accessToken?: string;
@@ -70,6 +70,7 @@ export default function LoginPage() {
             setErrorMessage('登录接口未返回有效凭证');
             return;
           }
+          setPreviewSessionEnabled(false);
           setAccessToken(payload.accessToken);
           navigate('/h5/messages');
         } catch (error) {
