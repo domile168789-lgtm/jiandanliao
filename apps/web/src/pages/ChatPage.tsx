@@ -3,6 +3,10 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import DataModeNotice from '../components/DataModeNotice';
 import {
   loadMessages,
+  markConversationRead,
+  sendAudioMessage,
+  sendImageMessage,
+  subscribeRealtimeMessages,
   subscribePreviewImUpdates,
   sendTextMessage,
   type MessageRow
@@ -19,6 +23,37 @@ const getMessageText = (row: MessageRow) => {
   return '[暂不支持的消息类型]';
 };
 
+const getMediaUrl = (row: MessageRow) => {
+  const candidate =
+    (typeof row.body.url === 'string' && row.body.url) ||
+    (typeof row.body.objectKey === 'string' && row.body.objectKey) ||
+    '';
+  if (!candidate) return '';
+  if (candidate.startsWith('blob:') || candidate.startsWith('data:') || candidate.startsWith('http')) return candidate;
+  if (candidate.startsWith('/')) return candidate;
+  return `/${candidate.replace(/^\/+/, '')}`;
+};
+
+const renderMessageBody = (row: MessageRow) => {
+  if (row.type === 'IMAGE') {
+    const src = getMediaUrl(row);
+    return src ? <img className="chat-media-image" src={src} alt="图片消息" /> : <p>[图片消息]</p>;
+  }
+
+  if (row.type === 'AUDIO') {
+    const src = getMediaUrl(row);
+    const durationMs = typeof row.body.durationMs === 'number' ? row.body.durationMs : Number(row.body.durationMs || 0);
+    return (
+      <div className="chat-audio-card">
+        {src ? <audio controls preload="metadata" src={src} /> : <p>[语音消息]</p>}
+        {durationMs > 0 ? <span>{Math.max(1, Math.round(durationMs / 1000))} 秒</span> : null}
+      </div>
+    );
+  }
+
+  return <p>{getMessageText(row)}</p>;
+};
+
 export default function ChatPage() {
   const { conversationId = 'demo-conversation' } = useParams();
   const location = useLocation();
@@ -26,8 +61,17 @@ export default function ChatPage() {
   const [loading, setLoading] = React.useState(true);
   const [draft, setDraft] = React.useState('');
   const [sending, setSending] = React.useState(false);
+  const [mediaSending, setMediaSending] = React.useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  const syncReadState = React.useCallback(async () => {
+    try {
+      await markConversationRead(conversationId);
+    } catch {
+      // ignore best-effort read acknowledgement
+    }
+  }, [conversationId]);
 
   const refresh = React.useCallback(
     async (cancelledRef?: { current: boolean }, nextLoading = false) => {
@@ -65,6 +109,23 @@ export default function ChatPage() {
       unsubscribe();
     };
   }, [refresh]);
+
+  React.useEffect(() => {
+    void syncReadState();
+  }, [syncReadState]);
+
+  React.useEffect(() => {
+    const unsubscribe = subscribeRealtimeMessages(
+      () => {
+        void refresh().then(() => syncReadState());
+      },
+      { conversationIds: [conversationId] }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [conversationId, refresh, syncReadState]);
 
   const conversationTitle = React.useMemo(() => {
     const locationTitle = (location.state as { conversationTitle?: string } | null)?.conversationTitle;
@@ -112,7 +173,8 @@ export default function ChatPage() {
           }
           return [...nextMessages, created];
         });
-        void refresh();
+        await refresh();
+        await syncReadState();
       }
     } catch (error) {
       setMessages((current) => current.filter((item) => item.id !== optimisticMessage.id));
@@ -122,6 +184,64 @@ export default function ChatPage() {
       setSending(false);
     }
   };
+
+  const handleSendMedia = React.useCallback(
+    async (file: File, type: 'IMAGE' | 'AUDIO') => {
+      const optimisticId = `${type.toLowerCase()}-${Date.now()}`;
+      const objectUrl =
+        typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
+          ? URL.createObjectURL(file)
+          : `${type.toLowerCase()}/${file.name}`;
+      const optimisticBody =
+        type === 'IMAGE'
+          ? { objectKey: objectUrl, url: objectUrl, mimeType: file.type, filename: file.name }
+          : {
+              objectKey: objectUrl,
+              url: objectUrl,
+              mimeType: file.type || 'audio/aac',
+              filename: file.name,
+              durationMs: 1_000
+            };
+      const optimisticMessage: MessageRow = {
+        id: optimisticId,
+        conversationId,
+        senderId: 'self',
+        type,
+        body: optimisticBody,
+        status: 'SENT',
+        createdAt: new Date().toISOString()
+      };
+
+      setMessages((current) => [...current, optimisticMessage]);
+      setMediaSending(type === 'IMAGE' ? '图片发送中...' : '语音发送中...');
+      setErrorMessage(null);
+
+      try {
+        const created =
+          type === 'IMAGE'
+            ? await sendImageMessage(conversationId, file)
+            : await sendAudioMessage(conversationId, file);
+        setMessages((current) => {
+          const nextMessages = current.filter((item) => item.id !== optimisticId);
+          if (created && !nextMessages.some((item) => item.id === created.id)) {
+            nextMessages.push(created);
+          }
+          return nextMessages;
+        });
+        await refresh();
+        await syncReadState();
+      } catch (error) {
+        setMessages((current) => current.filter((item) => item.id !== optimisticId));
+        setErrorMessage(getErrorMessage(error, type === 'IMAGE' ? '图片发送失败，请稍后重试' : '语音发送失败，请稍后重试'));
+      } finally {
+        setMediaSending(null);
+        if (objectUrl.startsWith('blob:') && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }
+    },
+    [conversationId, refresh, syncReadState]
+  );
 
   return (
     <section className="h5-page chat-page">
@@ -148,7 +268,7 @@ export default function ChatPage() {
                   key={message.id}
                   className={`chat-bubble ${isSelf ? 'is-self' : 'is-peer'} ${message.type === 'SYSTEM' ? 'is-system' : ''}`}
                 >
-                  <p>{getMessageText(message)}</p>
+                  {renderMessageBody(message)}
                   <time dateTime={message.createdAt || ''}>
                     {message.createdAt
                       ? new Date(message.createdAt).toLocaleTimeString('zh-CN', {
@@ -164,13 +284,52 @@ export default function ChatPage() {
       </section>
 
       <form className="chat-composer" onSubmit={handleSend}>
-        <input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="输入消息内容，发送后会自动刷新会话列表"
-        />
-        <button className="primary-button composer-button" type="submit" disabled={sending}>
-          {sending ? '发送中...' : '发送'}
+        <div className="chat-composer-main">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="输入消息内容，发送后会自动刷新会话列表"
+          />
+          <div className="composer-tools" aria-label="聊天扩展操作">
+            <label className="composer-tool" htmlFor="chat-image-upload">
+              图片
+            </label>
+            <input
+              id="chat-image-upload"
+              aria-label="发送图片"
+              className="composer-file-input"
+              type="file"
+              accept="image/*"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  void handleSendMedia(file, 'IMAGE');
+                }
+                event.currentTarget.value = '';
+              }}
+            />
+
+            <label className="composer-tool" htmlFor="chat-audio-upload">
+              语音
+            </label>
+            <input
+              id="chat-audio-upload"
+              aria-label="发送语音"
+              className="composer-file-input"
+              type="file"
+              accept="audio/*"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  void handleSendMedia(file, 'AUDIO');
+                }
+                event.currentTarget.value = '';
+              }}
+            />
+          </div>
+        </div>
+        <button className="primary-button composer-button" type="submit" disabled={sending || Boolean(mediaSending)}>
+          {mediaSending || (sending ? '发送中...' : '发送')}
         </button>
       </form>
     </section>

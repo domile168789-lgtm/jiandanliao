@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
@@ -215,6 +215,290 @@ describe('App route entry', () => {
     expect(await screen.findByRole('heading', { level: 1, name: '发现' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: '我的' }));
     expect(await screen.findByRole('heading', { level: 1, name: '我的' })).toBeInTheDocument();
+  });
+
+  it('shows unread badge in message list', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method || 'GET';
+        if (url.includes('/api/conversations') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              {
+                id: 'demo-business',
+                type: 'DM',
+                title: '商务对接',
+                lastMessage: '这里有 2 条未读',
+                updatedAt: '2026-07-30T12:00:00.000Z',
+                unreadCount: 2
+              }
+            ]
+          });
+        }
+
+        if (url.includes('/api/messages') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => []
+          });
+        }
+
+        const row = url.includes('group=mobile') ? brandingResponse.mobile : brandingResponse.pc;
+        return Promise.resolve({
+          ok: true,
+          json: async () => row
+        });
+      })
+    );
+
+    renderAt('/h5/messages', { token: 'demo-token' });
+
+    expect(await screen.findByText('2')).toHaveClass('conversation-unread-badge');
+  });
+
+  it('sends image messages from chat page', async () => {
+    const messages = [
+      {
+        id: 'message-1',
+        conversationId: 'demo-business',
+        senderId: 'peer',
+        type: 'TEXT',
+        body: { text: '你好，这里是商务对接窗口。' },
+        createdAt: '2026-07-30T12:00:00.000Z'
+      }
+    ];
+    const mockedFetch = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method || 'GET';
+
+        if (url.includes('/api/messages?conversationId=demo-business') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => messages
+          });
+        }
+
+        if (url.includes('/api/messages/read') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              ok: true,
+              conversationId: 'demo-business',
+              unreadCount: 0,
+              status: 'acknowledged'
+            })
+          });
+        }
+
+        if (url.includes('/api/files/upload-binary') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              fileId: 'file-image-1',
+              url: '/api/files/file-image-1/content',
+              mime: 'image/png',
+              size: 4,
+              width: 96,
+              height: 96,
+              durationMs: null,
+              transcoded: false
+            })
+          });
+        }
+
+        if (url.includes('/api/messages') && method === 'POST') {
+          const payload = JSON.parse(String(init?.body || '{}')) as { type?: string; body?: Record<string, unknown> };
+          messages.push({
+            id: 'message-image-1',
+            conversationId: 'demo-business',
+            senderId: 'self',
+            type: payload.type || 'IMAGE',
+            body: payload.body || {},
+            createdAt: '2026-07-30T12:01:00.000Z'
+          });
+          return Promise.resolve({
+            ok: true,
+            json: async () => messages[messages.length - 1]
+          });
+        }
+
+        if (url.includes('/api/conversations') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              {
+                id: 'demo-business',
+                type: 'DM',
+                title: '商务对接',
+                lastMessage: '[图片消息]',
+                updatedAt: '2026-07-30T12:01:00.000Z',
+                unreadCount: 0
+              }
+            ]
+          });
+        }
+
+        const row = url.includes('group=mobile') ? brandingResponse.mobile : brandingResponse.pc;
+        return Promise.resolve({
+          ok: true,
+          json: async () => row
+        });
+      });
+    vi.stubGlobal('fetch', mockedFetch);
+
+    renderAt('/h5/chat/demo-business', { token: 'demo-token' });
+    const file = new File(['demo'], 'proof.png', { type: 'image/png' });
+    const input = await screen.findByLabelText('发送图片');
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => {
+      expect(
+        mockedFetch.mock.calls.some(
+          ([requestUrl, init]) => String(requestUrl).includes('/api/files/upload-binary') && init?.method === 'POST'
+        )
+      ).toBe(true);
+    });
+    await waitFor(() => {
+      expect(
+        mockedFetch.mock.calls.some(([requestUrl, init]) => {
+          if (!String(requestUrl).endsWith('/api/messages') || init?.method !== 'POST' || typeof init.body !== 'string') {
+            return false;
+          }
+          return JSON.parse(init.body).type === 'IMAGE';
+        })
+      ).toBe(true);
+    });
+  });
+
+  it('sends audio messages from chat page', async () => {
+    const messages: Array<Record<string, unknown>> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method || 'GET';
+
+        if (url.includes('/api/messages?conversationId=demo-business') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => messages
+          });
+        }
+
+        if (url.includes('/api/messages/read') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              ok: true,
+              conversationId: 'demo-business',
+              unreadCount: 0
+            })
+          });
+        }
+
+        if (url.includes('/api/files/upload-binary') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              fileId: 'file-audio-1',
+              url: '/api/files/file-audio-1/content',
+              mime: 'audio/aac',
+              size: 8,
+              width: null,
+              height: null,
+              durationMs: 3_000,
+              transcoded: true
+            })
+          });
+        }
+
+        if (url.includes('/api/messages') && method === 'POST') {
+          const payload = JSON.parse(String(init?.body || '{}')) as { type?: string; body?: Record<string, unknown> };
+          messages.push({
+            id: 'message-audio-1',
+            conversationId: 'demo-business',
+            senderId: 'self',
+            type: payload.type || 'AUDIO',
+            body: payload.body || {},
+            createdAt: '2026-07-30T12:01:00.000Z'
+          });
+          return Promise.resolve({
+            ok: true,
+            json: async () => messages[messages.length - 1]
+          });
+        }
+
+        if (url.includes('/api/conversations') && method === 'GET') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => []
+          });
+        }
+
+        const row = url.includes('group=mobile') ? brandingResponse.mobile : brandingResponse.pc;
+        return Promise.resolve({
+          ok: true,
+          json: async () => row
+        });
+      })
+    );
+
+    renderAt('/h5/chat/demo-business', { token: 'demo-token' });
+    const file = new File(['demo audio'], 'voice.m4a', { type: 'audio/mp4' });
+    const input = await screen.findByLabelText('发送语音');
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(await screen.findByText('3 秒')).toBeInTheDocument();
+  });
+
+  it('marks conversation as read after opening chat', async () => {
+    const mockedFetch = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+
+      if (url.includes('/api/messages?conversationId=demo-business') && method === 'GET') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => []
+        });
+      }
+
+      if (url.includes('/api/messages/read') && method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            conversationId: 'demo-business',
+            unreadCount: 0,
+            status: 'acknowledged'
+          })
+        });
+      }
+
+      if (url.includes('/api/conversations') && method === 'GET') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => []
+        });
+      }
+
+      const row = url.includes('group=mobile') ? brandingResponse.mobile : brandingResponse.pc;
+      return Promise.resolve({
+        ok: true,
+        json: async () => row
+      });
+    });
+    vi.stubGlobal('fetch', mockedFetch);
+
+    renderAt('/h5/chat/demo-business', { token: 'demo-token' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: '商务对接' })).toBeInTheDocument();
+    expect(
+      mockedFetch.mock.calls.some(
+        ([input, init]) => String(input).includes('/api/messages/read') && init?.method === 'POST'
+      )
+    ).toBe(true);
   });
 
   it('keeps demo conversations visible when preview auth expires', async () => {

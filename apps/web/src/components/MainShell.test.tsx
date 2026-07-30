@@ -6,6 +6,7 @@ import MainShell from './MainShell';
 
 vi.mock('../api/chat', () => ({
   subscribePreviewImUpdates: vi.fn(() => () => undefined),
+  subscribeRealtimeMessages: vi.fn(() => () => undefined),
   loadConversations: vi.fn().mockResolvedValue({
     data: [
       {
@@ -13,7 +14,8 @@ vi.mock('../api/chat', () => ({
         type: 'DM',
         title: '商务对接',
         lastMessage: '你好，这里是最新消息',
-        updatedAt: '2026-07-30T12:00:00.000Z'
+        updatedAt: '2026-07-30T12:00:00.000Z',
+        unreadCount: 2
       }
     ],
     source: 'live'
@@ -39,6 +41,7 @@ describe('MainShell', () => {
       'href',
       '/h5/chat/conversation-1'
     );
+    expect(screen.getByText('2')).toHaveClass('conversation-unread-badge');
   });
 
   it('shows all plus menu entries', async () => {

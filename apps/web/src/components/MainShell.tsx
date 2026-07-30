@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   loadConversations,
+  subscribeRealtimeMessages,
   subscribePreviewImUpdates,
   type ConversationRow
 } from '../api/chat';
@@ -21,6 +22,7 @@ export default function MainShell() {
   const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const conversationIds = React.useMemo(() => rows.map((row) => row.id), [rows]);
 
   const refresh = React.useCallback(async (cancelledRef?: { current: boolean }) => {
     try {
@@ -63,6 +65,19 @@ export default function MainShell() {
       unsubscribe();
     };
   }, [refresh]);
+
+  React.useEffect(() => {
+    const unsubscribe = subscribeRealtimeMessages(
+      () => {
+        void refresh();
+      },
+      { conversationIds }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [conversationIds, refresh]);
 
   return (
     <section className="h5-page">
@@ -114,7 +129,12 @@ export default function MainShell() {
         {!loading && rows.length === 0 ? <p className="conversation-state">暂无会话</p> : null}
 
         {rows.map((row) => (
-          <Link key={row.id} className="conversation-link" to={`/h5/chat/${row.id}`}>
+          <Link
+            key={row.id}
+            className="conversation-link"
+            to={`/h5/chat/${row.id}`}
+            state={{ conversationTitle: row.title || row.type }}
+          >
             <article className="conversation-row">
               <div className={`conversation-avatar conversation-avatar-${row.type.toLowerCase()}`} aria-hidden="true">
                 {(row.title || row.type).slice(0, 1)}
@@ -134,7 +154,10 @@ export default function MainShell() {
                     ) : null}
                   </div>
                 </div>
-                <span>{row.lastMessage || '暂无消息'}</span>
+                <div className="conversation-summary-row">
+                  <span>{row.lastMessage || '暂无消息'}</span>
+                  {row.unreadCount ? <span className="conversation-unread-badge">{row.unreadCount}</span> : null}
+                </div>
               </div>
             </article>
           </Link>

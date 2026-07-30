@@ -1,4 +1,6 @@
-import { apiGet, apiPost } from './client';
+import { io, type Socket } from 'socket.io-client';
+import { getAccessToken } from '../state/session';
+import { apiFetch, apiGet, apiPost } from './client';
 import { withDemoFallback, type LoadableData } from './loadable';
 
 export type ConversationRow = {
@@ -7,6 +9,9 @@ export type ConversationRow = {
   title: string | null;
   lastMessage: string | null;
   updatedAt: string | null;
+  unreadCount?: number;
+  isPinned?: boolean;
+  isMuted?: boolean;
 };
 
 export type MessageRow = {
@@ -15,6 +20,7 @@ export type MessageRow = {
   senderId: string | null;
   type: 'TEXT' | 'IMAGE' | 'FILE' | 'AUDIO' | 'VIDEO' | 'SYSTEM';
   body: Record<string, unknown>;
+  status?: string | null;
   createdAt: string | null;
 };
 
@@ -38,6 +44,25 @@ type PreviewStore = {
   messages: Record<string, MessageRow[]>;
 };
 
+type UploadedBinaryFile = {
+  fileId: string;
+  url: string;
+  mime: string;
+  size: number;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  transcoded: boolean;
+};
+
+type RealtimeSubscriptionInput = {
+  conversationIds?: string[];
+};
+
+let realtimeSocket: Socket | null = null;
+let realtimeSocketBoundToken: string | null = null;
+let realtimeSocketSubject: string | null = null;
+
 const previewContacts: PreviewContact[] = [
   { phone: '855010100001', title: '系统通知', type: 'SYSTEM' },
   { phone: '855010100002', title: '商务对接', type: 'DM' },
@@ -54,28 +79,40 @@ const previewSeedStore = (): PreviewStore => ({
       type: 'SYSTEM',
       title: '系统通知',
       lastMessage: '后台公告、风控结果和活动发布会统一进入这里。',
-      updatedAt: buildIso(5)
+      updatedAt: buildIso(5),
+      unreadCount: 1,
+      isPinned: true,
+      isMuted: false
     },
     {
       id: 'demo-business',
       type: 'DM',
       title: '商务对接',
       lastMessage: '可以先确认一下今天的投放排期。',
-      updatedAt: buildIso(18)
+      updatedAt: buildIso(18),
+      unreadCount: 2,
+      isPinned: false,
+      isMuted: false
     },
     {
       id: 'demo-agency',
       type: 'GROUP',
       title: '渠道伙伴群',
       lastMessage: '新代理活动今晚 20:00 上线。',
-      updatedAt: buildIso(37)
+      updatedAt: buildIso(37),
+      unreadCount: 0,
+      isPinned: false,
+      isMuted: true
     },
     {
       id: 'demo-security',
       type: 'DM',
       title: '安全专员',
       lastMessage: '你的账号风控巡检已完成，状态正常。',
-      updatedAt: buildIso(84)
+      updatedAt: buildIso(84),
+      unreadCount: 1,
+      isPinned: false,
+      isMuted: false
     }
   ],
   messages: {
@@ -233,7 +270,10 @@ const ensurePreviewConversation = (input: { id: string; title: string; type: Con
     title: input.title,
     type: input.type,
     lastMessage: '新会话已创建，可以开始发送消息。',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    unreadCount: 0,
+    isPinned: false,
+    isMuted: false
   };
 
   store.conversations.unshift(nextConversation);
@@ -260,8 +300,34 @@ const appendPreviewMessage = (conversationId: string, message: MessageRow) => {
   store.messages[conversationId] = [...currentMessages, message];
   conversation.lastMessage = getMessageText(message);
   conversation.updatedAt = message.createdAt;
+  conversation.unreadCount =
+    message.senderId === 'self' || message.type === 'SYSTEM' ? conversation.unreadCount || 0 : (conversation.unreadCount || 0) + 1;
   store.conversations = sortConversations(store.conversations);
   savePreviewStore(store);
+};
+
+const markPreviewConversationRead = (conversationId: string) => {
+  const store = loadPreviewStore();
+  const conversation = store.conversations.find((row) => row.id === conversationId);
+  if (!conversation) {
+    return {
+      ok: true as const,
+      conversationId,
+      unreadCount: 0,
+      status: 'already read' as const
+    };
+  }
+
+  const unreadCount = Number(conversation.unreadCount || 0);
+  conversation.unreadCount = 0;
+  savePreviewStore(store);
+
+  return {
+    ok: true as const,
+    conversationId,
+    unreadCount: 0,
+    status: unreadCount > 0 ? ('acknowledged' as const) : ('already read' as const)
+  };
 };
 
 const schedulePreviewReply = (conversationId: string, text: string) => {
@@ -285,6 +351,33 @@ const schedulePreviewReply = (conversationId: string, text: string) => {
   }, 900);
 };
 
+const makePreviewObjectUrl = (file: File) => {
+  if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+    return URL.createObjectURL(file);
+  }
+  return `preview/${file.name}`;
+};
+
+const createPreviewMessage = (
+  conversationId: string,
+  type: MessageRow['type'],
+  body: Record<string, unknown>
+): MessageRow => {
+  const created: MessageRow = {
+    id: `preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    conversationId,
+    senderId: 'self',
+    type,
+    body,
+    status: 'SENT',
+    createdAt: new Date().toISOString()
+  };
+
+  appendPreviewMessage(conversationId, created);
+  schedulePreviewReply(conversationId, getMessageText(created));
+  return created;
+};
+
 const normalizeConversation = (payload: unknown): ConversationRow | null => {
   if (!payload || typeof payload !== 'object') return null;
 
@@ -299,7 +392,10 @@ const normalizeConversation = (payload: unknown): ConversationRow | null => {
     type,
     title: typeof row.title === 'string' ? row.title : null,
     lastMessage: typeof row.lastMessage === 'string' ? row.lastMessage : null,
-    updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : null
+    updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : null,
+    unreadCount: typeof row.unreadCount === 'number' ? row.unreadCount : Number(row.unreadCount || 0),
+    isPinned: Boolean(row.isPinned),
+    isMuted: Boolean(row.isMuted)
   };
 };
 
@@ -324,9 +420,133 @@ const normalizeMessage = (payload: unknown): MessageRow | null => {
         ? row.type
         : 'TEXT',
     body: row.body && typeof row.body === 'object' ? (row.body as Record<string, unknown>) : {},
+    status: typeof row.status === 'string' ? row.status : null,
     createdAt: typeof row.createdAt === 'string' ? row.createdAt : null
   };
 };
+
+const resolveSocketUrl = () => {
+  if (typeof window === 'undefined') return '';
+  const envUrl = import.meta.env.VITE_WS_BASE_URL;
+  if (typeof envUrl === 'string' && envUrl.trim()) {
+    return envUrl.trim();
+  }
+
+  const { protocol, hostname, port } = window.location;
+  if ((hostname === '127.0.0.1' || hostname === 'localhost') && port === '5173') {
+    return `${protocol}//${hostname}:3002`;
+  }
+  return `${protocol}//${window.location.host}`;
+};
+
+const decodeTokenSubject = (token: string | null) => {
+  if (!token) return null;
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const json = typeof window.atob === 'function' ? window.atob(padded) : '';
+    const parsed = JSON.parse(json) as { sub?: string };
+    return typeof parsed.sub === 'string' ? parsed.sub : null;
+  } catch {
+    return null;
+  }
+};
+
+const getRealtimeSocket = () => {
+  if (typeof window === 'undefined' || import.meta.env.VITEST) return null;
+
+  if (!realtimeSocket) {
+    realtimeSocket = io(resolveSocketUrl(), {
+      path: '/socket.io/',
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      autoConnect: true
+    });
+    realtimeSocket.on('connect', () => {
+      if (realtimeSocketSubject) {
+        realtimeSocket?.emit('auth:authenticate', { userId: realtimeSocketSubject });
+      }
+    });
+    realtimeSocketBoundToken = null;
+  }
+
+  const accessToken = getAccessToken();
+  if (realtimeSocket && accessToken && accessToken !== realtimeSocketBoundToken) {
+    const subject = decodeTokenSubject(accessToken);
+    if (subject) {
+      realtimeSocketSubject = subject;
+      realtimeSocket.emit('auth:authenticate', { userId: subject });
+      realtimeSocketBoundToken = accessToken;
+    }
+  }
+
+  return realtimeSocket;
+};
+
+const getConversationIds = (input?: RealtimeSubscriptionInput) =>
+  [...new Set((input?.conversationIds || []).map((item) => item.trim()).filter(Boolean))];
+
+async function uploadBinaryFile(
+  file: File,
+  kind: 'image' | 'voice',
+  fetcher: typeof fetch = fetch
+): Promise<UploadedBinaryFile> {
+  const formData = new FormData();
+  formData.set('kind', kind);
+  formData.set('file', file);
+
+  try {
+    const response = await apiFetch(
+      '/api/files/upload-binary',
+      {
+        method: 'POST',
+        body: formData
+      },
+      fetcher
+    );
+    return (await response.json()) as UploadedBinaryFile;
+  } catch {
+    return {
+      fileId: `local-${Date.now()}`,
+      url: makePreviewObjectUrl(file),
+      mime: file.type || (kind === 'image' ? 'image/png' : 'audio/aac'),
+      size: file.size,
+      width: null,
+      height: null,
+      durationMs: null,
+      transcoded: false
+    };
+  }
+}
+
+async function probeAudioDurationMs(file: File): Promise<number> {
+  if (typeof document === 'undefined' || typeof URL === 'undefined') {
+    return 1_000;
+  }
+
+  return await new Promise((resolve) => {
+    const audio = document.createElement('audio');
+    const objectUrl = URL.createObjectURL(file);
+    const done = (durationMs: number) => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(durationMs > 0 ? durationMs : 1_000);
+    };
+
+    const timer = window.setTimeout(() => done(1_000), 1_500);
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => {
+      window.clearTimeout(timer);
+      done(Math.max(1_000, Math.round((audio.duration || 0) * 1_000)));
+    };
+    audio.onerror = () => {
+      window.clearTimeout(timer);
+      done(1_000);
+    };
+    audio.src = objectUrl;
+  });
+}
 
 export function buildFallbackConversationId(phone: string) {
   return `contact-${phone.replace(/\D/g, '') || 'demo'}`;
@@ -387,17 +607,102 @@ export async function sendTextMessage(
   text: string,
   fetcher: typeof fetch = fetch
 ): Promise<MessageRow | null> {
-  const payload = await apiPost<unknown>(
-    '/api/messages',
-    {
-      conversationId,
-      type: 'TEXT',
-      body: { text }
-    },
-    fetcher
-  );
+  try {
+    const payload = await apiPost<unknown>(
+      '/api/messages',
+      {
+        conversationId,
+        type: 'TEXT',
+        body: { text }
+      },
+      fetcher
+    );
 
-  return normalizeMessage(payload);
+    return normalizeMessage(payload);
+  } catch {
+    return createPreviewMessage(conversationId, 'TEXT', { text });
+  }
+}
+
+export async function sendImageMessage(
+  conversationId: string,
+  file: File,
+  fetcher: typeof fetch = fetch
+): Promise<MessageRow | null> {
+  const uploaded = await uploadBinaryFile(file, 'image', fetcher);
+  const body = {
+    fileId: uploaded.fileId,
+    objectKey: uploaded.url,
+    url: uploaded.url,
+    mimeType: uploaded.mime || file.type || 'image/png',
+    dedupeKey: `${file.name}:${file.size}:${file.lastModified}`,
+    width: uploaded.width,
+    height: uploaded.height,
+    size: uploaded.size
+  };
+
+  try {
+    const payload = await apiPost<unknown>(
+      '/api/messages',
+      {
+        conversationId,
+        type: 'IMAGE',
+        body
+      },
+      fetcher
+    );
+    return normalizeMessage(payload);
+  } catch {
+    return createPreviewMessage(conversationId, 'IMAGE', body);
+  }
+}
+
+export async function sendAudioMessage(
+  conversationId: string,
+  file: File,
+  fetcher: typeof fetch = fetch
+): Promise<MessageRow | null> {
+  const uploaded = await uploadBinaryFile(file, 'voice', fetcher);
+  const durationMs = uploaded.durationMs || (await probeAudioDurationMs(file));
+  const body = {
+    fileId: uploaded.fileId,
+    objectKey: uploaded.url,
+    url: uploaded.url,
+    mimeType: uploaded.mime || file.type || 'audio/aac',
+    durationMs,
+    dedupeKey: `${file.name}:${file.size}:${file.lastModified}`,
+    size: uploaded.size
+  };
+
+  try {
+    const payload = await apiPost<unknown>(
+      '/api/messages',
+      {
+        conversationId,
+        type: 'AUDIO',
+        body
+      },
+      fetcher
+    );
+    return normalizeMessage(payload);
+  } catch {
+    return createPreviewMessage(conversationId, 'AUDIO', body);
+  }
+}
+
+export async function markConversationRead(
+  conversationId: string,
+  fetcher: typeof fetch = fetch
+): Promise<{ ok: true; conversationId: string; unreadCount: number; status?: string }> {
+  try {
+    return await apiPost<{ ok: true; conversationId: string; unreadCount: number; status?: string }>(
+      '/api/messages/read',
+      { conversationId },
+      fetcher
+    );
+  } catch {
+    return markPreviewConversationRead(conversationId);
+  }
 }
 
 export async function createDirectConversation(
@@ -429,4 +734,44 @@ export async function loadSelectableContacts(): Promise<SelectableContactRow[]> 
     title: item.title,
     type: item.type
   }));
+}
+
+export function subscribeRealtimeMessages(
+  listener: () => void,
+  input?: RealtimeSubscriptionInput
+) {
+  const socket = getRealtimeSocket();
+  if (!socket) {
+    return () => undefined;
+  }
+
+  const handler = () => listener();
+  const events = [
+    'message:new',
+    'receipt:new',
+    'message_created',
+    'message_read',
+    'message_delivered',
+    'unread.updated'
+  ] as const;
+  const conversationIds = getConversationIds(input);
+
+  const joinSubscribedConversations = () => {
+    conversationIds.forEach((conversationId) => {
+      socket.emit('conversation:join', { conversationId });
+    });
+  };
+
+  events.forEach((eventName) => {
+    socket.on(eventName, handler);
+  });
+  socket.on('connect', joinSubscribedConversations);
+  joinSubscribedConversations();
+
+  return () => {
+    events.forEach((eventName) => {
+      socket.off(eventName, handler);
+    });
+    socket.off('connect', joinSubscribedConversations);
+  };
 }
