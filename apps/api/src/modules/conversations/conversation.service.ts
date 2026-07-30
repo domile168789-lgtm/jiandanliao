@@ -124,24 +124,27 @@ export class ConversationService {
     return this.ensureDmByUserIds({ ownerUserId: ownerId, peerUserId: peerId });
   }
 
-  async createGroupByPhones(input: { ownerPhone: string; title: string; memberPhones: string[] }) {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+  async createGroupByPhones(input: { ownerPhone: string; title?: string; memberPhones: string[] }) {
+    if (!process.env.DATABASE_URL) {
+      return previewStore.createGroup(input);
+    }
     const db = getDb();
     const ownerId = await this.getUserIdByPhone(input.ownerPhone);
+    const title = input.title?.trim() || '新的群聊';
     const memberIds = Array.from(new Set(input.memberPhones.map((phone) => phone.trim()).filter(Boolean)));
     const resolvedMemberIds = (
       await Promise.all(memberIds.map(async (phone) => this.getUserIdByPhone(phone)))
     ).filter((userId) => userId !== ownerId);
 
-    if (!resolvedMemberIds.length) {
-      throw new Error('group requires at least one member');
+    if (resolvedMemberIds.length < 2) {
+      throw new Error('group requires at least 3 members including owner');
     }
 
     const now = new Date();
     const conversationId = randomUUID();
     await db.execute(
       `INSERT INTO conversations (id, type, title, last_message, updated_at) VALUES (?, 'GROUP', ?, NULL, ?)`,
-      [conversationId, input.title.trim(), now]
+      [conversationId, title, now]
     );
 
     const values: any[] = [randomUUID(), conversationId, ownerId, now];
@@ -161,7 +164,7 @@ export class ConversationService {
     return {
       id: conversationId,
       type: 'GROUP',
-      title: input.title.trim(),
+      title,
       memberCount: resolvedMemberIds.length + 1,
       updatedAt: now
     };

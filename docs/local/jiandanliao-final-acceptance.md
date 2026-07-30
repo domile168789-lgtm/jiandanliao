@@ -16,6 +16,7 @@
 - Web/H5：
   - 完整四 Tab、聊天、发现、我的、钱包、收益、代理、系统通知、资料、安全页
   - 真实数据优先，非鉴权错误允许演示兜底并显式标注
+  - 消息页已支持微信式 `+` 菜单中的 `发起群聊`，可完成选择联系人、填写群名、创建群聊并进入新群会话
 - Android：
   - 我的/发现相关页统一加载、错误、空态、来源提示
   - 会话列表、聊天页、发送后刷新、自动 READ 回执、预览会话标题映射已对齐 IM 主链路
@@ -31,6 +32,7 @@
 ## 当前环境已验证
 
 - `pnpm --filter @jianliao/api test -- admin.routes.test.ts receipt.routes.test.ts`
+- `pnpm --filter @jianliao/api test -- conversation.routes.test.ts`
 - `pnpm --filter @jianliao/web test`
 - `pnpm --filter @jianliao/web build`
 - `pnpm --filter @jianliao/admin-desktop test`

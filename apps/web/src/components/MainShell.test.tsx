@@ -1,7 +1,7 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import MainShell from './MainShell';
 
 vi.mock('../api/chat', () => ({
@@ -21,7 +21,11 @@ vi.mock('../api/chat', () => ({
 }));
 
 describe('MainShell', () => {
-  it('renders compose entry and conversation rows', async () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders plus entry and conversation rows', async () => {
     render(
       <MemoryRouter>
         <MainShell />
@@ -29,10 +33,24 @@ describe('MainShell', () => {
     );
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('消息');
-    expect(screen.getByRole('link', { name: '发起单聊' })).toHaveAttribute('href', '/h5/contacts');
+    expect(screen.getByRole('button', { name: '打开快捷菜单' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: /商务对接/ })).toHaveAttribute(
       'href',
       '/h5/chat/conversation-1'
     );
+  });
+
+  it('opens the plus menu and exposes 发起群聊', async () => {
+    render(
+      <MemoryRouter>
+        <MainShell />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '打开快捷菜单' }));
+    expect(await screen.findByRole('link', { name: '发起群聊' })).toHaveAttribute('href', '/h5/group/new');
+
+    fireEvent.click(screen.getByRole('button', { name: '打开快捷菜单' }));
+    expect(screen.queryByRole('link', { name: '发起群聊' })).not.toBeInTheDocument();
   });
 });

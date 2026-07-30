@@ -10,7 +10,14 @@ export async function conversationRoutes(app: FastifyInstance) {
   const isGroupOnlyOperation = (error: unknown) =>
     error instanceof Error && error.message === 'group only operation';
   const isBadRequest = (error: unknown) =>
-    error instanceof Error && error.message === 'group requires at least one member';
+    error instanceof Error &&
+    [
+      'group requires at least one member',
+      'group requires at least 3 members including owner',
+      'memberPhones must contain at least 2 items'
+    ].includes(error.message);
+  const isUserNotFound = (error: unknown) =>
+    error instanceof Error && error.message.startsWith('user not found:');
 
   app.get('/conversations', async (request, reply) => {
     if (!request.user?.phone) return reply.code(401).send({ code: 'UNAUTHORIZED' });
@@ -26,8 +33,10 @@ export async function conversationRoutes(app: FastifyInstance) {
   app.post('/conversations/group', async (request, reply) => {
     if (!request.user?.phone) return reply.code(401).send({ code: 'UNAUTHORIZED' });
     const body = request.body as { title?: string; memberPhones?: string[] };
-    if (!body?.title?.trim() || !Array.isArray(body.memberPhones)) {
-      return reply.code(400).send({ code: 'BAD_REQUEST' });
+    if (!Array.isArray(body?.memberPhones) || body.memberPhones.length < 2) {
+      return reply
+        .code(400)
+        .send({ code: 'BAD_REQUEST', message: 'memberPhones must contain at least 2 items' });
     }
 
     try {
@@ -37,7 +46,7 @@ export async function conversationRoutes(app: FastifyInstance) {
         memberPhones: body.memberPhones
       });
     } catch (error) {
-      if (isBadRequest(error)) {
+      if (isBadRequest(error) || isUserNotFound(error)) {
         return reply.code(400).send({ code: 'BAD_REQUEST', message: (error as Error).message });
       }
       throw error;

@@ -11,6 +11,8 @@ import EarningsPage from './pages/EarningsPage';
 import LoginPage from './pages/LoginPage';
 import MePage from './pages/MePage';
 import MessagesPage from './pages/MessagesPage';
+import NewGroupConfirmPage from './pages/NewGroupConfirmPage';
+import NewGroupPage from './pages/NewGroupPage';
 import ProfilePage from './pages/ProfilePage';
 import RegisterEntryPage from './pages/RegisterEntryPage';
 import SecurityPage from './pages/SecurityPage';
@@ -133,6 +135,24 @@ export default function AppRouter() {
       <Route path="/mobile" element={<LoginPage />} />
       <Route path="/pc" element={<LoginPage />} />
       <Route path="/" element={<LoginPage />} />
+
+      <Route
+        path="/h5/group/new"
+        element={
+          <RequireAuth>
+            <NewGroupPage />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/h5/group/new/confirm"
+        element={
+          <RequireAuth>
+            <NewGroupConfirmPage />
+          </RequireAuth>
+        }
+      />
 
       <Route
         path="/h5"

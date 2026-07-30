@@ -27,6 +27,12 @@ type PreviewContact = {
   type: 'SYSTEM' | 'DM' | 'GROUP';
 };
 
+export type SelectableContactRow = {
+  phone: string;
+  title: string;
+  type: PreviewContact['type'];
+};
+
 type PreviewStore = {
   conversations: ConversationRow[];
   messages: Record<string, MessageRow[]>;
@@ -407,4 +413,20 @@ export async function createDirectConversation(
   );
 
   return normalizeConversation(payload);
+}
+
+export async function createGroupConversation(
+  input: { title?: string; memberPhones: string[] },
+  fetcher: typeof fetch = fetch
+): Promise<ConversationRow | null> {
+  const payload = await apiPost<unknown>('/api/conversations/group', input, fetcher);
+  return normalizeConversation(payload);
+}
+
+export async function loadSelectableContacts(): Promise<SelectableContactRow[]> {
+  return previewContacts.map((item) => ({
+    phone: item.phone,
+    title: item.title,
+    type: item.type
+  }));
 }

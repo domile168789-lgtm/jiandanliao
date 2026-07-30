@@ -28,8 +28,22 @@ describe('App route entry', () => {
     cleanup();
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        const method = init?.method || 'GET';
+        if (url.includes('/api/conversations/group') && method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              id: 'preview-group-test',
+              type: 'GROUP',
+              title: '测试群聊',
+              lastMessage: null,
+              updatedAt: new Date().toISOString()
+            })
+          });
+        }
+
         if (url.includes('/api/conversations')) {
           return Promise.resolve({
             ok: true,
@@ -107,6 +121,26 @@ describe('App route entry', () => {
     expect(await screen.findByRole('heading', { level: 1, name: '发现' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: '我的' }));
     expect(await screen.findByRole('heading', { level: 1, name: '我的' })).toBeInTheDocument();
+  });
+
+  it('opens the new group flow route', async () => {
+    renderAt('/h5/group/new', { token: 'demo-token' });
+    expect(await screen.findByRole('heading', { level: 1, name: '选择联系人' })).toBeInTheDocument();
+  });
+
+  it('creates a group from the group flow', async () => {
+    renderAt('/h5/group/new', { token: 'demo-token' });
+
+    fireEvent.click(await screen.findByLabelText('选择 商务对接'));
+    fireEvent.click(screen.getByLabelText('选择 渠道伙伴群'));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    fireEvent.change(await screen.findByLabelText('群名称'), {
+      target: { value: '测试群聊' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: '完成' }));
+
+    expect(await screen.findByRole('heading', { level: 1, name: '测试群聊' })).toBeInTheDocument();
   });
 
   it('renders all extended client sections when authenticated', async () => {

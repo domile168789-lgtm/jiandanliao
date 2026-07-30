@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import DataModeNotice from '../components/DataModeNotice';
 import {
   loadMessages,
@@ -21,6 +21,7 @@ const getMessageText = (row: MessageRow) => {
 
 export default function ChatPage() {
   const { conversationId = 'demo-conversation' } = useParams();
+  const location = useLocation();
   const [messages, setMessages] = React.useState<MessageRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [draft, setDraft] = React.useState('');
@@ -66,6 +67,7 @@ export default function ChatPage() {
   }, [refresh]);
 
   const conversationTitle = React.useMemo(() => {
+    const locationTitle = (location.state as { conversationTitle?: string } | null)?.conversationTitle;
     const latestSystem = messages.find((item) => item.type === 'SYSTEM');
     if (conversationId === 'demo-system') return '系统通知';
     if (conversationId === 'demo-business') return '商务对接';
@@ -77,8 +79,9 @@ export default function ChatPage() {
     if (conversationId === 'preview-dm-security') return '安全专员';
     if (conversationId.startsWith('contact-')) return '单聊会话';
     if (latestSystem && typeof latestSystem.body.title === 'string') return latestSystem.body.title;
+    if (typeof locationTitle === 'string' && locationTitle.trim()) return locationTitle.trim();
     return '聊天';
-  }, [conversationId, messages]);
+  }, [conversationId, location.state, messages]);
 
   const handleSend = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

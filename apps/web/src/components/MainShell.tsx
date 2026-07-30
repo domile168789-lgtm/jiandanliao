@@ -13,6 +13,7 @@ export default function MainShell() {
   const [loading, setLoading] = React.useState(true);
   const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = React.useState(false);
 
   const refresh = React.useCallback(async (cancelledRef?: { current: boolean }) => {
     try {
@@ -63,9 +64,38 @@ export default function MainShell() {
           <h1>消息</h1>
           <p>系统会话、单聊与群聊入口统一收口到这里。</p>
         </div>
-        <Link aria-label="发起单聊" className="mini-link mini-link-icon" to="/h5/contacts">
-          +
-        </Link>
+        <div className="top-bar-action">
+          <button
+            type="button"
+            aria-label="打开快捷菜单"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            aria-controls="messages-plus-menu"
+            className="mini-link mini-link-icon button-link"
+            onClick={() => setMenuOpen((value) => !value)}
+          >
+            +
+          </button>
+
+          {menuOpen ? (
+            <>
+              <button
+                type="button"
+                aria-label="关闭快捷菜单"
+                className="plus-menu-backdrop"
+                onClick={() => setMenuOpen(false)}
+              />
+              <div id="messages-plus-menu" className="plus-menu" role="menu" aria-label="快捷菜单">
+                <Link className="plus-menu-item" to="/h5/group/new" onClick={() => setMenuOpen(false)}>
+                  <span className="plus-menu-item-icon" aria-hidden="true">
+                    群
+                  </span>
+                  <span>发起群聊</span>
+                </Link>
+              </div>
+            </>
+          ) : null}
+        </div>
       </header>
 
       <section className="placeholder-list" aria-label="消息列表">

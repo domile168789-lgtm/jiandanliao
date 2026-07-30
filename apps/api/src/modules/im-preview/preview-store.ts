@@ -420,6 +420,39 @@ export const previewStore = {
     };
   },
 
+  createGroup(input: { ownerPhone: string; title?: string; memberPhones: string[] }) {
+    const owner = ensureUser({ phone: input.ownerPhone });
+    const uniquePhones = Array.from(new Set([owner.phone, ...input.memberPhones.map(normalizePhone).filter(Boolean)]));
+
+    if (uniquePhones.length < 3) {
+      throw new Error('group requires at least 3 members including owner');
+    }
+
+    const members = uniquePhones.map((phone) => {
+      const user = getUserByPhone(phone);
+      if (!user) {
+        throw new Error(`user not found: ${phone}`);
+      }
+      return user;
+    });
+
+    const conversation: PreviewConversation = {
+      id: `preview-group-${randomUUID()}`,
+      type: 'GROUP',
+      title: input.title?.trim() || '新的群聊',
+      lastMessage: null,
+      updatedAt: new Date().toISOString(),
+      members: members.map((item) => item.id),
+      ownerUserId: owner.id
+    };
+
+    state.conversations.unshift(conversation);
+    state.messages[conversation.id] = [];
+    sortConversations(state.conversations);
+
+    return toConversationRow(conversation, owner.id);
+  },
+
   listMessages(input: { conversationId: string; phone: string; limit?: number }) {
     const access = this.resolveUserAccess(input.phone);
     ensureMember(input.conversationId, access.userId);
