@@ -1,6 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { loadConversations, type ConversationRow } from '../api/chat';
+import {
+  loadConversations,
+  subscribePreviewImUpdates,
+  type ConversationRow
+} from '../api/chat';
 import { getErrorMessage } from '../api/loadable';
 import DataModeNotice from './DataModeNotice';
 
@@ -16,29 +20,47 @@ export default function MainShell() {
   const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    let cancelled = false;
+  const refresh = React.useCallback(async (cancelledRef?: { current: boolean }) => {
+    try {
+      const result = await loadConversations();
+      if (cancelledRef?.current) return;
+      setRows(result.data);
+      setNoticeMessage(result.notice || null);
+      setErrorMessage(null);
+    } catch (error) {
+      if (cancelledRef?.current) return;
+      setRows([]);
+      setErrorMessage(getErrorMessage(error, '会话加载失败，请重新登录后重试'));
+    } finally {
+      if (cancelledRef?.current) return;
+      setLoading(false);
+    }
+  }, []);
 
-    void loadConversations()
-      .then((result) => {
-        if (cancelled) return;
-        setRows(result.data);
-        setNoticeMessage(result.notice || null);
+  React.useEffect(() => {
+    const cancelled = { current: false };
+
+    void refresh(cancelled)
+      .then(() => {
+        if (!cancelled.current) {
+          setLoading(false);
+        }
       })
-      .catch((error) => {
-        if (cancelled) return;
-        setRows([]);
-        setErrorMessage(getErrorMessage(error, '会话加载失败，请重新登录后重试'));
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
+      .catch(() => {
+        if (!cancelled.current) {
+          setLoading(false);
+        }
       });
 
+    const unsubscribe = subscribePreviewImUpdates(() => {
+      void refresh();
+    });
+
     return () => {
-      cancelled = true;
+      cancelled.current = true;
+      unsubscribe();
     };
-  }, []);
+  }, [refresh]);
 
   return (
     <section className="h5-page">
@@ -71,20 +93,23 @@ export default function MainShell() {
         {rows.map((row) => (
           <Link key={row.id} className="conversation-link" to={`/h5/chat/${row.id}`}>
             <article className="conversation-row">
-              <div className="conversation-avatar" aria-hidden="true">
+              <div className={`conversation-avatar conversation-avatar-${row.type.toLowerCase()}`} aria-hidden="true">
                 {(row.title || row.type).slice(0, 1)}
               </div>
               <div className="conversation-copy">
                 <div className="conversation-title-row">
                   <strong>{row.title || row.type}</strong>
-                  {row.updatedAt ? (
-                    <time dateTime={row.updatedAt}>
-                      {new Date(row.updatedAt).toLocaleDateString('zh-CN', {
-                        month: '2-digit',
-                        day: '2-digit'
-                      })}
-                    </time>
-                  ) : null}
+                  <div className="conversation-meta">
+                    <span className={`conversation-tag is-${row.type.toLowerCase()}`}>{row.type}</span>
+                    {row.updatedAt ? (
+                      <time dateTime={row.updatedAt}>
+                        {new Date(row.updatedAt).toLocaleTimeString('zh-CN', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </time>
+                    ) : null}
+                  </div>
                 </div>
                 <span>{row.lastMessage || '暂无消息'}</span>
               </div>

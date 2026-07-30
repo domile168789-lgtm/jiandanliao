@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import MainShell from './MainShell';
 
 vi.mock('../api/chat', () => ({
+  subscribePreviewImUpdates: vi.fn(() => () => undefined),
   loadConversations: vi.fn().mockResolvedValue({
     data: [
       {

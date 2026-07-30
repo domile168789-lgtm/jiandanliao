@@ -1,7 +1,12 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
 import DataModeNotice from '../components/DataModeNotice';
-import { loadMessages, sendTextMessage, type MessageRow } from '../api/chat';
+import {
+  loadMessages,
+  subscribePreviewImUpdates,
+  sendTextMessage,
+  type MessageRow
+} from '../api/chat';
 import { getErrorMessage } from '../api/loadable';
 
 const getMessageText = (row: MessageRow) => {
@@ -23,32 +28,53 @@ export default function ChatPage() {
   const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    let cancelled = false;
-
-    setLoading(true);
-    setNoticeMessage(null);
-    setErrorMessage(null);
-    void loadMessages(conversationId)
-      .then((result) => {
-        if (cancelled) return;
+  const refresh = React.useCallback(
+    async (cancelledRef?: { current: boolean }, nextLoading = false) => {
+      if (nextLoading && !cancelledRef?.current) {
+        setLoading(true);
+      }
+      try {
+        const result = await loadMessages(conversationId);
+        if (cancelledRef?.current) return;
         setMessages(result.data);
         setNoticeMessage(result.notice || null);
-      })
-      .catch((error) => {
-        if (cancelled) return;
+        setErrorMessage(null);
+      } catch (error) {
+        if (cancelledRef?.current) return;
         setMessages([]);
         setErrorMessage(getErrorMessage(error, '消息加载失败，请重新登录后重试'));
-      })
-      .finally(() => {
-        if (cancelled) return;
+      } finally {
+        if (cancelledRef?.current) return;
         setLoading(false);
-      });
+      }
+    },
+    [conversationId]
+  );
+
+  React.useEffect(() => {
+    const cancelled = { current: false };
+    void refresh(cancelled, true);
+
+    const unsubscribe = subscribePreviewImUpdates(() => {
+      void refresh();
+    });
 
     return () => {
-      cancelled = true;
+      cancelled.current = true;
+      unsubscribe();
     };
-  }, [conversationId]);
+  }, [refresh]);
+
+  const conversationTitle = React.useMemo(() => {
+    const latestSystem = messages.find((item) => item.type === 'SYSTEM');
+    if (conversationId === 'demo-system') return '系统通知';
+    if (conversationId === 'demo-business') return '商务对接';
+    if (conversationId === 'demo-agency') return '渠道伙伴群';
+    if (conversationId === 'demo-security') return '安全专员';
+    if (conversationId.startsWith('contact-')) return '单聊会话';
+    if (latestSystem && typeof latestSystem.body.title === 'string') return latestSystem.body.title;
+    return '聊天';
+  }, [conversationId, messages]);
 
   const handleSend = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -72,7 +98,13 @@ export default function ChatPage() {
     try {
       const created = await sendTextMessage(conversationId, nextDraft);
       if (created) {
-        setMessages((current) => [...current.filter((item) => item.id !== optimisticMessage.id), created]);
+        setMessages((current) => {
+          const nextMessages = current.filter((item) => item.id !== optimisticMessage.id);
+          if (nextMessages.some((item) => item.id === created.id)) {
+            return nextMessages;
+          }
+          return [...nextMessages, created];
+        });
       }
     } catch (error) {
       setMessages((current) => current.filter((item) => item.id !== optimisticMessage.id));
@@ -87,7 +119,7 @@ export default function ChatPage() {
     <section className="h5-page chat-page">
       <header className="top-bar top-bar-split">
         <div>
-          <h1>聊天</h1>
+          <h1>{conversationTitle}</h1>
           <p>会话 ID：{conversationId}</p>
         </div>
         <Link className="mini-link" to="/h5/messages">
@@ -127,7 +159,7 @@ export default function ChatPage() {
         <input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="输入消息内容"
+          placeholder="输入消息内容，发送后会自动刷新会话列表"
         />
         <button className="primary-button composer-button" type="submit" disabled={sending}>
           {sending ? '发送中...' : '发送'}

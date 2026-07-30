@@ -252,6 +252,18 @@ input {
   font-weight: 700;
 }
 
+.conversation-avatar-dm {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.conversation-avatar-group {
+  background: linear-gradient(135deg, #7c3aed, #4c1d95);
+}
+
+.conversation-avatar-system {
+  background: linear-gradient(135deg, #0f172a, #334155);
+}
+
 .conversation-copy {
   min-width: 0;
   display: grid;
@@ -265,6 +277,13 @@ input {
   gap: 12px;
 }
 
+.conversation-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
 .conversation-title-row strong {
   min-width: 0;
   overflow: hidden;
@@ -276,6 +295,33 @@ input {
 .conversation-copy span {
   color: #64748b;
   font-size: 13px;
+}
+
+.conversation-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.conversation-tag.is-dm {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+
+.conversation-tag.is-group {
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
+}
+
+.conversation-tag.is-system {
+  background: rgba(15, 23, 42, 0.1);
+  color: #0f172a;
 }
 
 .conversation-copy span {
