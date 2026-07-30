@@ -17,6 +17,16 @@ export type ServerEvent =
       };
     }
   | {
+      type: 'message_delivered';
+      conversationId: string;
+      receipt: {
+        messageId: string;
+        userId: string;
+        type: 'DELIVERED';
+        createdAt: string | Date;
+      };
+    }
+  | {
       type: 'message_read';
       conversationId: string;
       receipt: {
@@ -25,6 +35,12 @@ export type ServerEvent =
         type: 'DELIVERED' | 'READ';
         createdAt: string | Date;
       };
+    }
+  | {
+      type: 'unread_updated';
+      conversationId: string;
+      userId: string;
+      unreadCount: number;
     }
   | {
       type: 'system_notice';

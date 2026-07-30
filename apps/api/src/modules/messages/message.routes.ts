@@ -108,4 +108,40 @@ export async function messageRoutes(app: FastifyInstance) {
       throw error;
     }
   });
+
+  app.post('/messages/read', async (request, reply) => {
+    if (!request.user?.phone) return reply.code(401).send({ code: 'UNAUTHORIZED' });
+    const body = request.body as { conversationId?: string };
+    if (!body?.conversationId) {
+      return reply.code(400).send({ code: 'BAD_REQUEST' });
+    }
+
+    try {
+      await resolveUserAccessByPhone(request.user.phone);
+      await conversationService.assertConversationMember(body.conversationId, request.user.phone);
+
+      if (!process.env.DATABASE_URL) {
+        return previewStore.markConversationRead({
+          phone: request.user.phone,
+          conversationId: body.conversationId
+        });
+      }
+
+      return await service.markConversationRead({
+        phone: request.user.phone,
+        conversationId: body.conversationId
+      });
+    } catch (error) {
+      if (isForbiddenConversationAccess(error)) {
+        return reply.code(403).send({ code: 'FORBIDDEN' });
+      }
+      if (error instanceof UserAccessError && error.message === 'user banned') {
+        return reply.code(403).send({ code: 'FORBIDDEN' });
+      }
+      if (error instanceof UserAccessError) {
+        return reply.code(401).send({ code: 'UNAUTHORIZED' });
+      }
+      throw error;
+    }
+  });
 }

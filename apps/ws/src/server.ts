@@ -50,6 +50,17 @@ const emitServerEvent = (event: ServerEvent) => {
     return;
   }
 
+  if (event.type === 'message_delivered') {
+    io.to(`conversation:${event.conversationId}`).emit('message_delivered', event);
+    io.to(`conversation:${event.conversationId}`).emit('receipt:new', event.receipt);
+    return;
+  }
+
+  if (event.type === 'unread_updated') {
+    io.to(`user:${event.userId}`).emit('unread.updated', event);
+    return;
+  }
+
   if (event.type === 'system_notice') {
     io.to(`conversation:${event.conversationId}`).emit('system_notice', event);
     return;

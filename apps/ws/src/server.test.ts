@@ -31,4 +31,20 @@ describe('ws events', () => {
       }
     });
   });
+
+  it('supports unread updated server events', () => {
+    expect(
+      buildServerEvent({
+        type: 'unread_updated',
+        conversationId: 'c1',
+        userId: 'u1',
+        unreadCount: 0
+      })
+    ).toEqual({
+      type: 'unread_updated',
+      conversationId: 'c1',
+      userId: 'u1',
+      unreadCount: 0
+    });
+  });
 });

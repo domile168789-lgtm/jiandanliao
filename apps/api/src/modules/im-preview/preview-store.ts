@@ -414,6 +414,14 @@ const previewMessageText = (message: PreviewMessage) => {
   return '[消息]';
 };
 
+const hasReadReceipt = (messageId: string, userId: string) =>
+  state.receipts.some((item) => item.messageId === messageId && item.userId === userId && item.type === 'READ');
+
+const getConversationUnreadCount = (conversationId: string, userId: string) =>
+  listMessagesByConversation(conversationId).filter(
+    (message) => message.senderId !== null && message.senderId !== userId && !hasReadReceipt(message.id, userId)
+  ).length;
+
 const touchConversation = (conversationId: string, message: PreviewMessage) => {
   const row = state.conversations.find((item) => item.id === conversationId);
   if (!row) return;
@@ -447,7 +455,10 @@ const toConversationRow = (conversation: PreviewConversation, currentUserId: str
       ? getDirectPeerTitle(conversation.members, currentUserId)
       : (conversation.title ?? conversation.type),
   lastMessage: conversation.lastMessage,
-  updatedAt: conversation.updatedAt
+  updatedAt: conversation.updatedAt,
+  unreadCount: getConversationUnreadCount(conversation.id, currentUserId),
+  isPinned: false,
+  isMuted: false
 });
 
 const ensureMember = (conversationId: string, userId: string) => {
@@ -718,6 +729,42 @@ export const previewStore = {
       type: receipt.type,
       status: 'acknowledged',
       createdAt: receipt.createdAt
+    };
+  },
+
+  markConversationRead(input: { phone: string; conversationId: string }) {
+    const access = this.resolveUserAccess(input.phone);
+    ensureMember(input.conversationId, access.userId);
+    const unreadMessages = listMessagesByConversation(input.conversationId).filter(
+      (message) =>
+        message.senderId !== null && message.senderId !== access.userId && !hasReadReceipt(message.id, access.userId)
+    );
+
+    if (!unreadMessages.length) {
+      return {
+        ok: true as const,
+        conversationId: input.conversationId,
+        unreadCount: 0,
+        status: 'already read' as const
+      };
+    }
+
+    const createdAt = new Date().toISOString();
+    state.receipts.push(
+      ...unreadMessages.map((message) => ({
+        id: randomUUID(),
+        messageId: message.id,
+        userId: access.userId,
+        type: 'READ' as const,
+        createdAt
+      }))
+    );
+
+    return {
+      ok: true as const,
+      conversationId: input.conversationId,
+      unreadCount: 0,
+      status: 'acknowledged' as const
     };
   },
 

@@ -237,18 +237,43 @@ export class ConversationService {
     if (!process.env.DATABASE_URL) {
       return previewStore.listConversations(phone);
     }
+    let userId: string;
+    try {
+      userId = await this.getUserIdByPhone(phone);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('user not found:')) {
+        return [];
+      }
+      throw error;
+    }
     const db = getDb();
     const [rows] = await db.execute<any[]>(
-      `SELECT c.id, c.type, c.title, c.last_message AS lastMessage, c.updated_at AS updatedAt
+      `SELECT c.id,
+              c.type,
+              c.title,
+              c.last_message AS lastMessage,
+              c.updated_at AS updatedAt,
+              COALESCE(SUM(CASE WHEN msg.sender_id <> ? AND rr.id IS NULL THEN 1 ELSE 0 END), 0) AS unreadCount,
+              0 AS isPinned,
+              0 AS isMuted
        FROM conversations c
-       JOIN conversation_members m ON m.conversation_id = c.id
-       JOIN users u ON u.id = m.user_id
-       WHERE u.phone = ?
+       JOIN conversation_members m ON m.conversation_id = c.id AND m.user_id = ?
+       LEFT JOIN messages msg ON msg.conversation_id = c.id
+       LEFT JOIN message_receipts rr
+         ON rr.message_id = msg.id
+        AND rr.user_id = ?
+        AND rr.type = 'READ'
+       GROUP BY c.id, c.type, c.title, c.last_message, c.updated_at
        ORDER BY c.updated_at DESC
        LIMIT 100`,
-      [phone]
+      [userId, userId, userId]
     );
-    return rows;
+    return rows.map((row) => ({
+      ...row,
+      unreadCount: Number(row.unreadCount || 0),
+      isPinned: Boolean(row.isPinned),
+      isMuted: Boolean(row.isMuted)
+    }));
   }
 
   async assertConversationMember(conversationId: string, phone: string) {

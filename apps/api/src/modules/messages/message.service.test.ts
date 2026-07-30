@@ -3,6 +3,7 @@ import {
   buildMessagePreview,
   MessageService,
   MessageValidationError,
+  normalizeAudioBody,
   normalizeImageBody
 } from './message.service';
 
@@ -63,6 +64,37 @@ describe('MessageService', () => {
       mimeType: 'image/jpeg',
       dedupeKey: 'custom-key'
     });
+  });
+
+  it('normalizes audio message payload with duration and dedupe key', async () => {
+    const service = new MessageService();
+    const msg = await service.create({
+      conversationId: 'c1',
+      senderId: 'u1',
+      type: 'AUDIO',
+      body: {
+        fileId: 'voice-1',
+        objectKey: ' uploads/audio/voice.webm ',
+        mimeType: 'AUDIO/WEBM',
+        durationMs: '2500'
+      }
+    });
+
+    expect(msg.type).toBe('AUDIO');
+    expect(msg.body.objectKey).toBe('uploads/audio/voice.webm');
+    expect(msg.body.mimeType).toBe('audio/webm');
+    expect(msg.body.durationMs).toBe(2500);
+    expect(msg.body.dedupeKey).toBe('voice-1:uploads/audio/voice.webm');
+  });
+
+  it('rejects invalid audio message payloads', () => {
+    expect(() =>
+      normalizeAudioBody({
+        objectKey: 'uploads/audio/voice.webm',
+        mimeType: 'audio/webm',
+        durationMs: 0
+      })
+    ).toThrow(MessageValidationError);
   });
 
   it('builds unified previews for file/audio/video/system messages', () => {

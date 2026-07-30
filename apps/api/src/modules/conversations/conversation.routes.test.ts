@@ -52,6 +52,29 @@ describe('conversationRoutes', () => {
     expect(res.json()).toEqual([]);
   });
 
+  it('returns unread and mute metadata for seeded preview conversations', async () => {
+    const app = await buildApp();
+    const token = signAccessToken({ sub: '855010100000', deviceId: 'ios-1' });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/conversations',
+      headers: { authorization: `Bearer ${token}` }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'preview-dm-business',
+          unreadCount: 1,
+          isPinned: false,
+          isMuted: false
+        })
+      ])
+    );
+  });
+
   it('rejects unauthenticated group create', async () => {
     const app = await buildApp();
     const res = await app.inject({

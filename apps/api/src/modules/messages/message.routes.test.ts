@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { assertConversationMemberMock, createMock, executeMock, MockMessageValidationError } = vi.hoisted(() => ({
+const { assertConversationMemberMock, createMock, markConversationReadMock, executeMock, MockMessageValidationError } =
+  vi.hoisted(() => ({
   assertConversationMemberMock: vi.fn(),
   createMock: vi.fn(),
+  markConversationReadMock: vi.fn(),
   executeMock: vi.fn(),
   MockMessageValidationError: class MockMessageValidationError extends Error {}
-}));
+  }));
 
 vi.mock('../conversations/conversation.service', () => ({
   ConversationService: vi.fn().mockImplementation(() => ({
@@ -15,7 +17,8 @@ vi.mock('../conversations/conversation.service', () => ({
 
 vi.mock('./message.service', () => ({
   MessageService: vi.fn().mockImplementation(() => ({
-    create: createMock
+    create: createMock,
+    markConversationRead: markConversationReadMock
   })),
   MessageValidationError: MockMessageValidationError
 }));
@@ -37,6 +40,12 @@ describe('messageRoutes authorization', () => {
     process.env.DATABASE_URL = 'mysql://root:root@mysql:3306/jianliao';
     assertConversationMemberMock.mockResolvedValue(undefined);
     createMock.mockResolvedValue({ id: 'm-default', status: 'SENT' });
+    markConversationReadMock.mockResolvedValue({
+      ok: true,
+      conversationId: 'c1',
+      unreadCount: 0,
+      status: 'acknowledged'
+    });
   });
 
   it('rejects unauthenticated message create', async () => {
@@ -98,6 +107,33 @@ describe('messageRoutes authorization', () => {
     });
 
     expect(res.statusCode).toBe(403);
+  });
+
+  it('marks conversations as read for conversation members', async () => {
+    executeMock.mockResolvedValueOnce([[{ id: 'u1', status: 'ACTIVE' }]]);
+
+    const app = Fastify();
+    app.addHook('preHandler', async (request) => {
+      request.user = { phone: '85510000001' };
+    });
+    await app.register(messageRoutes, { prefix: '/api' });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/messages/read',
+      payload: { conversationId: 'c1' }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(markConversationReadMock).toHaveBeenCalledWith({
+      phone: '85510000001',
+      conversationId: 'c1'
+    });
+    expect(res.json()).toMatchObject({
+      ok: true,
+      conversationId: 'c1',
+      unreadCount: 0
+    });
   });
 
   it('creates messages for conversation members', async () => {

@@ -18,6 +18,15 @@ type ImageMessageBody = {
   [key: string]: any;
 };
 
+type AudioMessageBody = {
+  fileId?: string;
+  objectKey: string;
+  mimeType: string;
+  dedupeKey: string;
+  durationMs: number;
+  [key: string]: any;
+};
+
 type SystemMessageInput = {
   targetUserId?: string;
   targetUserIds?: string[];
@@ -46,6 +55,11 @@ const ensureObjectBody = (body: unknown) => {
 };
 
 const normalizeStringField = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+const normalizePositiveInt = (value: unknown) => {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numeric) ? Math.trunc(numeric) : 0;
+};
 
 const publishServerEvent = async (event: Record<string, unknown>) => {
   if (!process.env.REDIS_URL) return;
@@ -92,10 +106,45 @@ export const normalizeImageBody = (body: unknown): ImageMessageBody => {
   };
 };
 
+export const normalizeAudioBody = (body: unknown): AudioMessageBody => {
+  const payload = ensureObjectBody(body);
+  const fileId = normalizeStringField(payload.fileId);
+  const objectKey = normalizeStringField(payload.objectKey);
+  const mimeType = normalizeStringField(payload.mimeType).toLowerCase();
+  const durationMs = normalizePositiveInt(payload.durationMs);
+  const dedupeKey =
+    normalizeStringField(payload.dedupeKey) || [fileId || 'audio', objectKey || 'missing-object'].join(':');
+
+  if (!objectKey || !mimeType || durationMs <= 0) {
+    throw new MessageValidationError('missing audio fields');
+  }
+
+  return {
+    ...payload,
+    ...(fileId ? { fileId } : {}),
+    objectKey,
+    mimeType,
+    durationMs,
+    dedupeKey
+  };
+};
+
 export class MessageService {
+  private async getUserIdByPhone(phone: string) {
+    const db = getDb();
+    const [rows] = await db.execute<any[]>('SELECT id FROM users WHERE phone = ? LIMIT 1', [phone]);
+    const userId = rows?.[0]?.id as string | undefined;
+    if (!userId) throw new Error(`user not found: ${phone}`);
+    return userId;
+  }
+
   private normalizeBody(input: CreateMessageInput) {
     if (input.type === 'IMAGE') {
       return normalizeImageBody(input.body);
+    }
+
+    if (input.type === 'AUDIO') {
+      return normalizeAudioBody(input.body);
     }
 
     return ensureObjectBody(input.body);
@@ -225,5 +274,56 @@ export class MessageService {
     }
 
     return message;
+  }
+
+  async markConversationRead(input: { conversationId: string; phone: string }) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required');
+    }
+
+    const db = getDb();
+    const userId = await this.getUserIdByPhone(input.phone);
+    const [rows] = await db.execute<any[]>(
+      `SELECT m.id
+       FROM messages m
+       LEFT JOIN message_receipts r
+         ON r.message_id = m.id
+        AND r.user_id = ?
+        AND r.type = 'READ'
+       WHERE m.conversation_id = ?
+         AND m.sender_id <> ?
+         AND r.id IS NULL`,
+      [userId, input.conversationId, userId]
+    );
+
+    if (rows.length) {
+      const createdAt = new Date();
+      const values: any[] = [];
+      const placeholders = rows
+        .map((row) => {
+          values.push(randomUUID(), row.id, userId, 'READ', createdAt);
+          return '(?, ?, ?, ?, ?)';
+        })
+        .join(', ');
+
+      await db.execute(
+        `INSERT INTO message_receipts (id, message_id, user_id, type, created_at) VALUES ${placeholders}`,
+        values
+      );
+    }
+
+    await publishServerEvent({
+      type: 'unread_updated',
+      conversationId: input.conversationId,
+      userId,
+      unreadCount: 0
+    });
+
+    return {
+      ok: true as const,
+      conversationId: input.conversationId,
+      unreadCount: 0,
+      status: rows.length ? ('acknowledged' as const) : ('already read' as const)
+    };
   }
 }
