@@ -1,4 +1,5 @@
 import { apiGet } from './client';
+import { withDemoFallback, type LoadableData } from './loadable';
 
 export type ProfileOverview = {
   displayName: string;
@@ -102,14 +103,6 @@ const fallbackActivities: ActivityPreview[] = [
     status: '已发布'
   }
 ];
-
-const safeGet = async <T>(path: string, fallback: T, fetcher: typeof fetch = fetch): Promise<T> => {
-  try {
-    return await apiGet<T>(path, fetcher);
-  } catch {
-    return fallback;
-  }
-};
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -217,30 +210,68 @@ export function getFallbackActivityFeed() {
   return fallbackActivities;
 }
 
-export async function fetchProfileOverview(fetcher: typeof fetch = fetch) {
-  return asProfileOverview(await safeGet<unknown>('/api/profile/summary', fallbackProfile, fetcher));
-}
+const getProfileOverview = async (fetcher: typeof fetch = fetch) =>
+  asProfileOverview(await apiGet<unknown>('/api/profile/summary', fetcher));
 
-export async function fetchWalletSummary(fetcher: typeof fetch = fetch) {
-  return asWalletSummary(await safeGet<unknown>('/api/profile/wallet', fallbackWallet, fetcher));
-}
+const getWalletSummary = async (fetcher: typeof fetch = fetch) =>
+  asWalletSummary(await apiGet<unknown>('/api/profile/wallet', fetcher));
 
-export async function fetchEarningsSummary(fetcher: typeof fetch = fetch) {
-  return asEarningsSummary(await safeGet<unknown>('/api/profile/earnings', fallbackEarnings, fetcher));
-}
+const getEarningsSummary = async (fetcher: typeof fetch = fetch) =>
+  asEarningsSummary(await apiGet<unknown>('/api/profile/earnings', fetcher));
 
-export async function fetchAgentOverview(fetcher: typeof fetch = fetch) {
-  return asAgentOverview(await safeGet<unknown>('/api/profile/agent', fallbackAgent, fetcher));
-}
+const getAgentOverview = async (fetcher: typeof fetch = fetch) =>
+  asAgentOverview(await apiGet<unknown>('/api/profile/agent', fetcher));
 
-export async function fetchSystemNotices(fetcher: typeof fetch = fetch) {
-  return asSystemNotices(
-    await safeGet<unknown>('/api/profile/system-notices', fallbackNotices, fetcher)
+const getSystemNotices = async (fetcher: typeof fetch = fetch) =>
+  asSystemNotices(await apiGet<unknown>('/api/profile/system-notices', fetcher));
+
+const getActivityFeed = async (fetcher: typeof fetch = fetch) =>
+  asActivityFeed(await apiGet<unknown>('/api/public/activity-campaigns', fetcher));
+
+export async function loadProfileOverview(fetcher: typeof fetch = fetch): Promise<LoadableData<ProfileOverview>> {
+  return withDemoFallback(
+    () => getProfileOverview(fetcher),
+    fallbackProfile,
+    '个人资料接口暂不可用，当前展示演示资料。'
   );
 }
 
-export async function fetchActivityFeed(fetcher: typeof fetch = fetch) {
-  return asActivityFeed(
-    await safeGet<unknown>('/api/public/activity-campaigns', fallbackActivities, fetcher)
+export async function loadWalletSummary(fetcher: typeof fetch = fetch): Promise<LoadableData<WalletSummary>> {
+  return withDemoFallback(
+    () => getWalletSummary(fetcher),
+    fallbackWallet,
+    '钱包接口暂不可用，当前展示演示数据。'
+  );
+}
+
+export async function loadEarningsSummary(fetcher: typeof fetch = fetch): Promise<LoadableData<EarningsSummary>> {
+  return withDemoFallback(
+    () => getEarningsSummary(fetcher),
+    fallbackEarnings,
+    '收益接口暂不可用，当前展示演示数据。'
+  );
+}
+
+export async function loadAgentOverview(fetcher: typeof fetch = fetch): Promise<LoadableData<AgentOverview>> {
+  return withDemoFallback(
+    () => getAgentOverview(fetcher),
+    fallbackAgent,
+    '代理中心接口暂不可用，当前展示演示数据。'
+  );
+}
+
+export async function loadSystemNotices(fetcher: typeof fetch = fetch): Promise<LoadableData<SystemNotice[]>> {
+  return withDemoFallback(
+    () => getSystemNotices(fetcher),
+    fallbackNotices,
+    '系统通知接口暂不可用，当前展示演示通知。'
+  );
+}
+
+export async function loadActivityFeed(fetcher: typeof fetch = fetch): Promise<LoadableData<ActivityPreview[]>> {
+  return withDemoFallback(
+    () => getActivityFeed(fetcher),
+    fallbackActivities,
+    '活动列表接口暂不可用，当前展示演示活动。'
   );
 }

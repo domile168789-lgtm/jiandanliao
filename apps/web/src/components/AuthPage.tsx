@@ -6,6 +6,7 @@ type AuthPageProps = {
   platformGroup: BrandingPlatformGroup;
   isSubmitting?: boolean;
   errorMessage?: string | null;
+  noticeMessage?: string | null;
   onEnter: (input: { account: string; password: string }) => void | Promise<void>;
   onSwitchToRegister: () => void;
 };
@@ -15,6 +16,7 @@ export default function AuthPage({
   platformGroup,
   isSubmitting = false,
   errorMessage = null,
+  noticeMessage = null,
   onEnter,
   onSwitchToRegister
 }: AuthPageProps) {
@@ -69,6 +71,7 @@ export default function AuthPage({
           </label>
 
           {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
+          {noticeMessage ? <p className="form-notice">{noticeMessage}</p> : null}
 
           <button
             className="primary-button horse-login-button"

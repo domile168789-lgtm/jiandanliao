@@ -10,7 +10,12 @@ struct JianliaoIOSApp: App {
     let authStore = AuthStore()
     _authStore = StateObject(wrappedValue: authStore)
     _wsClient = StateObject(wrappedValue: WSClient())
-    _profileStore = StateObject(wrappedValue: ProfileStore(service: ProfileService(authProvider: authStore)))
+    _profileStore = StateObject(
+      wrappedValue: ProfileStore(
+        service: ProfileService(authProvider: authStore),
+        noticeFallbackProvider: { authStore.pendingNotices }
+      )
+    )
   }
 
   var body: some Scene {

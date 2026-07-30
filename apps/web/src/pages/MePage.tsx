@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import DataModeNotice from '../components/DataModeNotice';
+import { getErrorMessage } from '../api/loadable';
 import {
-  fetchAgentOverview,
-  fetchProfileOverview,
-  fetchWalletSummary,
+  loadAgentOverview,
+  loadProfileOverview,
+  loadWalletSummary,
   type AgentOverview,
   type ProfileOverview,
   type WalletSummary
@@ -13,17 +15,28 @@ export default function MePage() {
   const [profile, setProfile] = React.useState<ProfileOverview | null>(null);
   const [wallet, setWallet] = React.useState<WalletSummary | null>(null);
   const [agent, setAgent] = React.useState<AgentOverview | null>(null);
+  const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
-    void Promise.all([fetchProfileOverview(), fetchWalletSummary(), fetchAgentOverview()]).then(
-      ([nextProfile, nextWallet, nextAgent]) => {
+    void Promise.all([loadProfileOverview(), loadWalletSummary(), loadAgentOverview()])
+      .then(([profileResult, walletResult, agentResult]) => {
         if (cancelled) return;
-        setProfile(nextProfile);
-        setWallet(nextWallet);
-        setAgent(nextAgent);
-      }
-    );
+        setProfile(profileResult.data);
+        setWallet(walletResult.data);
+        setAgent(agentResult.data);
+        setNoticeMessage(
+          profileResult.notice || walletResult.notice || agentResult.notice || null
+        );
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setProfile(null);
+        setWallet(null);
+        setAgent(null);
+        setErrorMessage(getErrorMessage(error, '我的页面加载失败，请稍后重试'));
+      });
 
     return () => {
       cancelled = true;
@@ -36,6 +49,8 @@ export default function MePage() {
         <h1>我的</h1>
       </header>
       <div className="placeholder-list">
+        {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
+        {noticeMessage ? <DataModeNotice message={noticeMessage} /> : null}
         <section className="section-card profile-hero">
           <strong>{profile?.displayName || '加载中...'}</strong>
           <span>{profile?.phone || '请稍候'}</span>

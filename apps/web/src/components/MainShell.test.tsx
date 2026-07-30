@@ -5,15 +5,18 @@ import { describe, expect, it, vi } from 'vitest';
 import MainShell from './MainShell';
 
 vi.mock('../api/chat', () => ({
-  listConversations: vi.fn().mockResolvedValue([
-    {
-      id: 'conversation-1',
-      type: 'DM',
-      title: '商务对接',
-      lastMessage: '你好，这里是最新消息',
-      updatedAt: '2026-07-30T12:00:00.000Z'
-    }
-  ])
+  loadConversations: vi.fn().mockResolvedValue({
+    data: [
+      {
+        id: 'conversation-1',
+        type: 'DM',
+        title: '商务对接',
+        lastMessage: '你好，这里是最新消息',
+        updatedAt: '2026-07-30T12:00:00.000Z'
+      }
+    ],
+    source: 'live'
+  })
 }));
 
 describe('MainShell', () => {

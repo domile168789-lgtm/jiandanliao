@@ -1,5 +1,26 @@
 import Foundation
 
+private let demoMemberSince = "2026-07-01"
+
+private func profilePhoneDigits(_ phone: String?) -> String {
+  (phone ?? "").filter(\.isNumber)
+}
+
+private func profilePhoneTail(_ phone: String?) -> String {
+  let digits = profilePhoneDigits(phone)
+  return digits.isEmpty ? "0000" : String(digits.suffix(4))
+}
+
+private func profileSeed(_ phone: String?) -> Int {
+  profilePhoneDigits(phone).reduce(0) { partialResult, digit in
+    partialResult + Int(String(digit))!
+  }
+}
+
+private func clampMoney(_ value: Double) -> Double {
+  (value * 100).rounded() / 100
+}
+
 struct ProfileSummaryPayload: Codable {
   var displayName: String
   var phone: String
@@ -19,6 +40,16 @@ struct ProfileSummaryPayload: Codable {
       safetyLevel: "标准保护"
     )
   }
+
+  static func demo(phone: String?) -> ProfileSummaryPayload {
+    let phoneText = (phone?.isEmpty == false ? phone : nil) ?? "演示账号"
+    return ProfileSummaryPayload(
+      displayName: "用户\(profilePhoneTail(phone))",
+      phone: phoneText,
+      memberSince: demoMemberSince,
+      safetyLevel: "标准保护"
+    )
+  }
 }
 
 struct ProfileWalletPayload: Codable {
@@ -33,6 +64,16 @@ struct ProfileWalletPayload: Codable {
     currency: AppConfig.walletCurrencyCode,
     updatedAt: ""
   )
+
+  static func demo(phone: String?) -> ProfileWalletPayload {
+    let seed = profileSeed(phone)
+    return ProfileWalletPayload(
+      balance: clampMoney(960 + Double(seed) * 7.2),
+      pendingIncome: clampMoney(88 + Double(seed) * 2.1),
+      currency: AppConfig.walletCurrencyCode,
+      updatedAt: ISO8601DateFormatter().string(from: .now)
+    )
+  }
 }
 
 struct ProfileEarningsPayload: Codable {
@@ -41,6 +82,15 @@ struct ProfileEarningsPayload: Codable {
   var thisMonth: Double
 
   static let placeholder = ProfileEarningsPayload(today: 0, thisWeek: 0, thisMonth: 0)
+
+  static func demo(phone: String?) -> ProfileEarningsPayload {
+    let seed = Double(profileSeed(phone))
+    return ProfileEarningsPayload(
+      today: clampMoney(18 + seed * 0.7),
+      thisWeek: clampMoney(136 + seed * 3.3),
+      thisMonth: clampMoney(640 + seed * 11.8)
+    )
+  }
 }
 
 struct ProfileAgentPayload: Codable {
@@ -55,6 +105,19 @@ struct ProfileAgentPayload: Codable {
     commissionRate: "--",
     status: "待接入"
   )
+
+  static func demo(phone: String?) -> ProfileAgentPayload {
+    let levels = ["普通代理", "高级代理", "渠道代理"]
+    let commissionRates = ["12%", "18%", "24%"]
+    let seed = profileSeed(phone)
+    let index = levels.isEmpty ? 0 : seed % levels.count
+    return ProfileAgentPayload(
+      level: levels[index],
+      teamCount: 4 + (seed % 18),
+      commissionRate: commissionRates[index],
+      status: "演示状态"
+    )
+  }
 }
 
 struct ProfileSystemNoticePayload: Codable, Identifiable, Hashable {

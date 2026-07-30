@@ -15,11 +15,19 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.jianliao.android.core.ServiceLocator
-import com.jianliao.android.data.repo.DiscoverEntry
+import com.jianliao.android.ui.components.AsyncScreenState
+import com.jianliao.android.ui.components.DataSourceNoticeCard
+import com.jianliao.android.ui.components.EmptyStateCard
+import com.jianliao.android.ui.components.ErrorStateCard
+import com.jianliao.android.ui.components.LoadingStateCard
+import com.jianliao.android.ui.components.rememberAsyncScreenState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,9 +36,13 @@ fun DiscoverScreen(
     onOpenSystemNotice: () -> Unit,
     onOpenAgent: () -> Unit
 ) {
-    val entries = produceState(initialValue = emptyList<DiscoverEntry>()) {
-        value = ServiceLocator.profileRepository.getDiscoverEntries()
-    }.value
+    var reloadToken by rememberSaveable { mutableStateOf(0) }
+    val screenState = rememberAsyncScreenState(
+        key = reloadToken,
+        errorMessage = "加载发现页失败"
+    ) {
+        ServiceLocator.profileRepository.getDiscoverEntries()
+    }
 
     Scaffold(
         topBar = {
@@ -52,6 +64,11 @@ fun DiscoverScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
+                Button(onClick = { reloadToken += 1 }) {
+                    Text("重新加载")
+                }
+            }
+            item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(16.dp),
@@ -68,14 +85,47 @@ fun DiscoverScreen(
                     }
                 }
             }
-            items(entries) { entry ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(entry.title, style = MaterialTheme.typography.titleSmall)
-                        Text(entry.description, style = MaterialTheme.typography.bodyMedium)
+            when (screenState) {
+                AsyncScreenState.Loading -> item {
+                    LoadingStateCard("正在加载发现页入口...")
+                }
+
+                is AsyncScreenState.Error -> item {
+                    ErrorStateCard(
+                        title = "发现页加载失败",
+                        message = screenState.message,
+                        actionLabel = "重试",
+                        onAction = { reloadToken += 1 }
+                    )
+                }
+
+                is AsyncScreenState.Success -> {
+                    val result = screenState.result
+                    val entries = result.data
+                    item {
+                        DataSourceNoticeCard(result)
+                    }
+                    if (entries.isEmpty()) {
+                        item {
+                            EmptyStateCard(
+                                title = "暂无发现入口",
+                                message = "当前还没有可展示的活动、公告或推广入口。",
+                                actionLabel = "重新加载",
+                                onAction = { reloadToken += 1 }
+                            )
+                        }
+                    } else {
+                        items(entries) { entry ->
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(entry.title, style = MaterialTheme.typography.titleSmall)
+                                    Text(entry.description, style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
+                        }
                     }
                 }
             }

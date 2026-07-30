@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { adminAuthPlugin } from '../../plugins/admin-auth.plugin.js';
+import { adminAuthPlugin, authenticateAdminCredentials, signAdminAccessToken } from '../../plugins/admin-auth.plugin.js';
 import { AdminService } from './admin.service.js';
 import { BrandingService } from './branding.service.js';
 import { GroupBotService } from '../group-bot/group-bot.service.js';
@@ -34,6 +34,22 @@ export async function adminRoutes(app: FastifyInstance) {
   const brandingService = new BrandingService();
   const groupBotService = new GroupBotService();
   const activityService = new ActivityService();
+
+  app.post('/admin/login', async (request, reply) => {
+    const body = request.body as { username?: unknown; password?: unknown };
+    const username = typeof body?.username === 'string' ? body.username : '';
+    const password = typeof body?.password === 'string' ? body.password : '';
+    const admin = authenticateAdminCredentials({ username, password });
+
+    if (!admin) {
+      return reply.code(401).send({ code: 'UNAUTHORIZED' });
+    }
+
+    return {
+      accessToken: signAdminAccessToken(admin),
+      admin
+    };
+  });
 
   app.get('/admin/users', async (request, reply) => {
     if (!ensureAdmin(request, reply, adminReadRoles)) return;
@@ -100,6 +116,12 @@ export async function adminRoutes(app: FastifyInstance) {
       content: body.content,
       adminId: request.admin!.id
     });
+  });
+
+  app.get('/admin/announcements', async (request, reply) => {
+    if (!ensureAdmin(request, reply, adminReadRoles)) return;
+    const { limit } = request.query as { limit?: string };
+    return service.listAnnouncements(limit ? Number(limit) : undefined);
   });
 
   app.get('/admin/audit-actions', async (request, reply) => {

@@ -12,8 +12,21 @@ struct ProfileView: View {
   var body: some View {
     NavigationStack {
       List {
+        if let tone = profile.statusTone,
+           let title = profile.statusTitle,
+           let message = profile.statusMessage {
+          Section {
+            StatusBanner(tone: tone, title: title, message: message, actionTitle: "重新拉取") {
+              Task {
+                await profile.refreshAll(phoneHint: auth.phone)
+              }
+            }
+          }
+        }
+
         Section {
           VStack(alignment: .leading, spacing: 8) {
+            SourceBadge(isLive: profile.summarySource.isLive)
             Text(profile.summary.displayName)
               .font(.title3.weight(.semibold))
             Text(profile.summary.phone)
@@ -28,6 +41,12 @@ struct ProfileView: View {
             )
               .font(.footnote.weight(.medium))
               .foregroundStyle(profile.isRestricted ? .orange : .green)
+
+            if let summaryIssue = profile.issue(for: .summary) {
+              Text("资料接口失败，当前展示演示兜底：\(summaryIssue)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
           }
           .padding(.vertical, 4)
         }
@@ -78,7 +97,16 @@ struct ProfileView: View {
         Section("账号操作") {
           Button("刷新 Token") {
             Task {
-              try? await auth.refreshIfNeeded()
+              do {
+                try await auth.refreshIfNeeded()
+                await profile.refreshAll(phoneHint: auth.phone)
+              } catch {
+                auth.appendNotice(
+                  title: "刷新 Token 失败",
+                  detail: error.localizedDescription,
+                  source: "auth"
+                )
+              }
             }
           }
 

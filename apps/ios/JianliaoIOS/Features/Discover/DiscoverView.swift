@@ -7,29 +7,61 @@ struct DiscoverView: View {
   var body: some View {
     NavigationStack {
       List {
+        if let tone = profile.statusTone,
+           let title = profile.statusTitle,
+           let message = profile.statusMessage {
+          Section {
+            StatusBanner(tone: tone, title: title, message: message, actionTitle: "重新拉取") {
+              Task {
+                await profile.refreshAll(phoneHint: auth.phone)
+              }
+            }
+          }
+        }
+
         Section("运营入口") {
           NavigationLink {
             SystemNoticeView()
           } label: {
-            FeatureRow(title: "系统通知", subtitle: noticeSubtitle, icon: "bell.badge")
+            FeatureRow(
+              title: "系统通知",
+              subtitle: noticeSubtitle,
+              icon: "bell.badge",
+              isLive: profile.noticesSource.isLive
+            )
           }
 
           NavigationLink {
             WalletView()
           } label: {
-            FeatureRow(title: "钱包", subtitle: walletSubtitle, icon: "wallet.pass")
+            FeatureRow(
+              title: "钱包",
+              subtitle: walletSubtitle,
+              icon: "wallet.pass",
+              isLive: profile.walletSource.isLive
+            )
           }
 
           NavigationLink {
             EarningsView()
           } label: {
-            FeatureRow(title: "收益", subtitle: earningsSubtitle, icon: "chart.line.uptrend.xyaxis")
+            FeatureRow(
+              title: "收益",
+              subtitle: earningsSubtitle,
+              icon: "chart.line.uptrend.xyaxis",
+              isLive: profile.earningsSource.isLive
+            )
           }
 
           NavigationLink {
             AgentView()
           } label: {
-            FeatureRow(title: "代理", subtitle: agentSubtitle, icon: "person.3.sequence")
+            FeatureRow(
+              title: "代理",
+              subtitle: agentSubtitle,
+              icon: "person.3.sequence",
+              isLive: profile.agentSource.isLive
+            )
           }
         }
 
@@ -78,6 +110,7 @@ private struct FeatureRow: View {
   let title: String
   let subtitle: String
   let icon: String
+  let isLive: Bool
 
   var body: some View {
     HStack(spacing: 12) {
@@ -86,8 +119,11 @@ private struct FeatureRow: View {
         .foregroundStyle(.indigo)
         .frame(width: 28)
       VStack(alignment: .leading, spacing: 4) {
-        Text(title)
-          .font(.headline)
+        HStack {
+          Text(title)
+            .font(.headline)
+          SourceBadge(isLive: isLive)
+        }
         Text(subtitle)
           .font(.footnote)
           .foregroundStyle(.secondary)

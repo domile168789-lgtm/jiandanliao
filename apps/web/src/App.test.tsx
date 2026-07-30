@@ -154,6 +154,35 @@ describe('App route entry', () => {
     expect(await screen.findByText('柬聊 PC 品牌')).toBeInTheDocument();
   });
 
+  it('keeps login on page when auth request fails and does not write demo token', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/api/auth/login/password')) {
+          return Promise.resolve({
+            ok: false,
+            status: 500
+          });
+        }
+
+        const row = url.includes('group=mobile') ? brandingResponse.mobile : brandingResponse.pc;
+        return Promise.resolve({
+          ok: true,
+          json: async () => row
+        });
+      })
+    );
+
+    renderAt('/h5/login');
+    fireEvent.change(screen.getByLabelText('账号'), { target: { value: '855010100001' } });
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'secret-123' } });
+    fireEvent.click(screen.getByRole('button', { name: '登录' }));
+
+    expect(await screen.findByText('服务暂不可用，请稍后重试')).toBeInTheDocument();
+    expect(window.localStorage.getItem('jianliao_access_token')).toBeNull();
+  });
+
   it('renders download page on /app', () => {
     renderAt('/app');
     expect(screen.getByText('柬单聊下载')).toBeInTheDocument();

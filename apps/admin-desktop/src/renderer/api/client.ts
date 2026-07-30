@@ -89,14 +89,18 @@ export const request = async <T>(
     body?: unknown;
     session?: AdminSession | null;
     baseUrl?: string;
+    auth?: boolean;
   } = {}
 ): Promise<T> => {
   const session = init.session ?? loadSession();
-  if (!session?.accessToken) throw new ApiError('UNAUTHORIZED', 401, 'UNAUTHORIZED');
+  const requireAuth = init.auth ?? true;
+  if (requireAuth && !session?.accessToken) throw new ApiError('UNAUTHORIZED', 401, 'UNAUTHORIZED');
 
   const headers = new Headers();
   headers.set('Accept', 'application/json');
-  headers.set('Authorization', `Bearer ${session.accessToken}`);
+  if (session?.accessToken) {
+    headers.set('Authorization', `Bearer ${session.accessToken}`);
+  }
 
   const hasBody = init.body !== undefined;
   if (hasBody) headers.set('Content-Type', 'application/json');

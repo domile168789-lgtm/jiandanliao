@@ -82,4 +82,14 @@ describe('admin-desktop smoke', () => {
     expect(owners).toContain('推导数据');
     expect(proxy).toContain('演示数据');
   });
+
+  it('marks demo fallback explicitly on desktop pages that allow local examples', () => {
+    const branding = readFileSync(new URL('./ui/pages/BrandingPage.tsx', import.meta.url), 'utf-8');
+    const groups = readFileSync(new URL('./ui/pages/GroupsPage.tsx', import.meta.url), 'utf-8');
+    const owners = readFileSync(new URL('./ui/pages/GroupOwnersPage.tsx', import.meta.url), 'utf-8');
+
+    expect(branding).toContain('演示品牌数据');
+    expect(groups).toContain('演示群组');
+    expect(owners).toContain('演示提醒');
+  });
 });

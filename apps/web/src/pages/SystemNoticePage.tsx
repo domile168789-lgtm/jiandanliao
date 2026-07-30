@@ -1,17 +1,29 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { fetchSystemNotices, type SystemNotice } from '../api/profile';
+import DataModeNotice from '../components/DataModeNotice';
+import { getErrorMessage } from '../api/loadable';
+import { loadSystemNotices, type SystemNotice } from '../api/profile';
 
 export default function SystemNoticePage() {
   const [rows, setRows] = React.useState<SystemNotice[]>([]);
+  const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
-    void fetchSystemNotices().then((nextRows) => {
-      if (!cancelled) {
-        setRows(nextRows);
-      }
-    });
+    void loadSystemNotices()
+      .then((result) => {
+        if (!cancelled) {
+          setRows(result.data);
+          setNoticeMessage(result.notice || null);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setRows([]);
+          setErrorMessage(getErrorMessage(error, '系统通知加载失败，请稍后重试'));
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -30,6 +42,8 @@ export default function SystemNoticePage() {
         </Link>
       </header>
       <div className="placeholder-list list-stack">
+        {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
+        {noticeMessage ? <DataModeNotice message={noticeMessage} /> : null}
         {rows.map((row) => (
           <article key={row.id} className="list-row notice-row">
             <div>

@@ -361,6 +361,15 @@ p {
   line-height: 1.6;
 }
 
+.demo-note {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(249, 115, 22, 0.26);
+  background: rgba(120, 53, 15, 0.18);
+  color: #fdba74;
+  line-height: 1.6;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

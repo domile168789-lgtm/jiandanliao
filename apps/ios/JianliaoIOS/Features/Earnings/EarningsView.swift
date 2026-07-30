@@ -6,14 +6,29 @@ struct EarningsView: View {
 
   var body: some View {
     List {
+      Section {
+        VStack(alignment: .leading, spacing: 10) {
+          SourceBadge(isLive: profile.earningsSource.isLive)
+          if let issue = profile.issue(for: .earnings) {
+            Text("收益接口失败，当前展示演示兜底：\(issue)")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          } else {
+            Text("今日、本周、本月收益均来自实时接口。")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+
       Section("收益概览") {
-        StatRow(title: "今日收益", value: currency(profile.earnings.today), trend: "轻量接口")
-        StatRow(title: "本周收益", value: currency(profile.earnings.thisWeek), trend: "实时概览")
+        StatRow(title: "今日收益", value: currency(profile.earnings.today), trend: profile.earningsSource.isLive ? "实时概览" : "演示兜底")
+        StatRow(title: "本周收益", value: currency(profile.earnings.thisWeek), trend: profile.earningsSource.isLive ? "实时概览" : "演示兜底")
         StatRow(title: "本月收益", value: currency(profile.earnings.thisMonth), trend: "按月累计")
       }
 
       Section("结算节奏") {
-        Text("收益页已切到轻量收益接口，继续保留结算说明结构，便于代理、钱包、公告之间形成闭环。")
+        Text("真实接口优先；接口失败时展示演示数据，并保留结算说明与发现页联动。")
           .font(.footnote)
           .foregroundStyle(.secondary)
       }

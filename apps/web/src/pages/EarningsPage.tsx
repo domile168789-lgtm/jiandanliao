@@ -1,17 +1,29 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { fetchEarningsSummary, type EarningsSummary } from '../api/profile';
+import DataModeNotice from '../components/DataModeNotice';
+import { getErrorMessage } from '../api/loadable';
+import { loadEarningsSummary, type EarningsSummary } from '../api/profile';
 
 export default function EarningsPage() {
   const [earnings, setEarnings] = React.useState<EarningsSummary | null>(null);
+  const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
-    void fetchEarningsSummary().then((nextEarnings) => {
-      if (!cancelled) {
-        setEarnings(nextEarnings);
-      }
-    });
+    void loadEarningsSummary()
+      .then((result) => {
+        if (!cancelled) {
+          setEarnings(result.data);
+          setNoticeMessage(result.notice || null);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setEarnings(null);
+          setErrorMessage(getErrorMessage(error, '收益加载失败，请稍后重试'));
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -30,6 +42,8 @@ export default function EarningsPage() {
         </Link>
       </header>
       <div className="placeholder-list stats-grid">
+        {errorMessage ? <div className="form-error stats-grid-full">{errorMessage}</div> : null}
+        {noticeMessage ? <DataModeNotice message={noticeMessage} /> : null}
         <article className="stat-card">
           <strong>{earnings?.today ?? '--'}</strong>
           <span>今日收益</span>

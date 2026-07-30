@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getFallbackBranding, loadBranding, resolveBrandingGroup } from '../api/branding';
 import { ApiError, apiPost } from '../api/client';
+import { getErrorMessage } from '../api/loadable';
 import AuthPage from '../components/AuthPage';
 import { hasAccessToken, setAccessToken } from '../state/session';
 
@@ -19,15 +20,17 @@ export default function LoginPage() {
   const [brand, setBrand] = React.useState(() => getFallbackBranding(platformGroup));
   const [submitting, setSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
 
     setBrand(getFallbackBranding(platformGroup));
 
-    void loadBranding(location.pathname).then((nextBrand) => {
+    void loadBranding(location.pathname).then((result) => {
       if (!cancelled) {
-        setBrand(nextBrand);
+        setBrand(result.data);
+        setNoticeMessage(result.notice || null);
       }
     });
 
@@ -46,6 +49,7 @@ export default function LoginPage() {
       platformGroup={platformGroup}
       isSubmitting={submitting}
       errorMessage={errorMessage}
+      noticeMessage={noticeMessage}
       onEnter={async ({ account, password }) => {
         if (!account || !password) {
           setErrorMessage('请输入账号和密码');
@@ -62,7 +66,11 @@ export default function LoginPage() {
             deviceId: 'web-h5-device',
             platform: 'H5'
           });
-          setAccessToken(payload.accessToken || 'demo-access-token');
+          if (!payload.accessToken?.trim()) {
+            setErrorMessage('登录接口未返回有效凭证');
+            return;
+          }
+          setAccessToken(payload.accessToken);
           navigate('/h5/messages');
         } catch (error) {
           if (error instanceof ApiError && error.status === 401) {
@@ -70,8 +78,7 @@ export default function LoginPage() {
           } else if (error instanceof ApiError && error.status === 403) {
             setErrorMessage('当前账号已被限制登录');
           } else {
-            setAccessToken('demo-access-token');
-            navigate('/h5/messages');
+            setErrorMessage(getErrorMessage(error, '登录失败，请稍后重试'));
           }
         } finally {
           setSubmitting(false);

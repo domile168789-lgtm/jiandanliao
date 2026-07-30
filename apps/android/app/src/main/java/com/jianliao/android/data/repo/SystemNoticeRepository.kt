@@ -13,43 +13,49 @@ data class SystemNoticeItem(
 class SystemNoticeRepository(
     private val api: JianliaoApi
 ) {
-    suspend fun listNotices(): List<SystemNoticeItem> = runCatching {
-        api.getProfileSystemNotices().map { notice ->
-            SystemNoticeItem(
-                category = resolveCategory(notice.title, notice.summary),
-                title = notice.title,
-                content = notice.summary,
-                timestamp = formatTime(notice.createdAt)
-            )
-        }
+    suspend fun listNotices(): RepositoryResult<List<SystemNoticeItem>> = runCatching {
+        networkResult(
+            data = api.getProfileSystemNotices().map { notice ->
+                SystemNoticeItem(
+                    category = resolveCategory(notice.title, notice.summary),
+                    title = notice.title,
+                    content = notice.summary,
+                    timestamp = formatTime(notice.createdAt)
+                )
+            },
+            message = "系统通知列表来自真实接口。"
+        )
     }.getOrElse {
         val session = ServiceLocator.sessionState.value
         val riskContent = session.restrictionReason ?: "当前账号状态正常，如有风险策略变更会在此同步。"
-        listOf(
-            SystemNoticeItem(
-                category = "官方公告",
-                title = "柬单聊 Android 完整版已接入发现/我的/系统通知导航",
-                content = "现在可从底部导航进入消息、通讯录、发现、我的四大主区。",
-                timestamp = "今天 10:00"
+        fallbackResult(
+            data = listOf(
+                SystemNoticeItem(
+                    category = "官方公告",
+                    title = "柬单聊 Android 完整版已接入发现/我的/系统通知导航",
+                    content = "现在可从底部导航进入消息、通讯录、发现、我的四大主区。",
+                    timestamp = "今天 10:00"
+                ),
+                SystemNoticeItem(
+                    category = "风险通知",
+                    title = "账号安全状态",
+                    content = riskContent,
+                    timestamp = "今天 09:40"
+                ),
+                SystemNoticeItem(
+                    category = "举报反馈",
+                    title = "举报处理回执",
+                    content = "用户举报结果会由后台联动写入系统通知会话，后续可替换为真实接口数据。",
+                    timestamp = "昨天 19:20"
+                ),
+                SystemNoticeItem(
+                    category = "活动消息",
+                    title = "活动中心开放邀请奖励",
+                    content = "进入发现页可查看活动中心、推广入口与下载引导。",
+                    timestamp = "昨天 14:05"
+                )
             ),
-            SystemNoticeItem(
-                category = "风险通知",
-                title = "账号安全状态",
-                content = riskContent,
-                timestamp = "今天 09:40"
-            ),
-            SystemNoticeItem(
-                category = "举报反馈",
-                title = "举报处理回执",
-                content = "用户举报结果会由后台联动写入系统通知会话，后续可替换为真实接口数据。",
-                timestamp = "昨天 19:20"
-            ),
-            SystemNoticeItem(
-                category = "活动消息",
-                title = "活动中心开放邀请奖励",
-                content = "进入发现页可查看活动中心、推广入口与下载引导。",
-                timestamp = "昨天 14:05"
-            )
+            message = "系统通知接口暂不可用，已展示最近的演示公告与风险消息。"
         )
     }
 

@@ -146,6 +146,24 @@ export class AdminService {
     return { id: announcementId, status: 'PUBLISHED', audited: true };
   }
 
+  async listAnnouncements(limit = 20) {
+    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+    const db = getDb();
+    const safeLimit = Math.min(Math.max(Number(limit) || 0, 1), 50);
+    const [rows] = await db.execute<any[]>(
+      `SELECT id,
+              title,
+              content,
+              status,
+              created_by AS createdBy,
+              created_at AS createdAt
+       FROM announcements
+       ORDER BY created_at DESC
+       LIMIT ${safeLimit}`
+    );
+    return rows;
+  }
+
   async listAuditActions(limit = 100) {
     if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
     const db = getDb();

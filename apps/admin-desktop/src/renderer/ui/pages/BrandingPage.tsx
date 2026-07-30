@@ -45,19 +45,25 @@ export const BrandingPage = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [sourceMode, setSourceMode] = useState<'live' | 'demo' | 'loading'>('loading');
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
     setLoading(true);
     setError(null);
+    setSourceMode('loading');
     try {
       const rows = await getBrandingConfigs();
       setForm(rowsToState(rows));
       if (!rows.length) {
+        setSourceMode('demo');
         setError('品牌配置接口已接通，但当前没有数据，已展示预置示例。');
+      } else {
+        setSourceMode('live');
       }
     } catch {
       setForm(rowsToState(FALLBACK_ROWS));
+      setSourceMode('demo');
       setError('品牌配置接口暂不可用，当前展示本地示例数据。');
     } finally {
       setLoading(false);
@@ -118,6 +124,7 @@ export const BrandingPage = () => {
         themeAssetUrl: saved.themeAssetUrl || '',
         holidayThemeAssetUrl: saved.holidayThemeAssetUrl || ''
       });
+      setSourceMode('live');
       setSuccess('统一品牌配置已保存，并同步到移动端与 PC 端。');
     } catch (e: any) {
       setError(String(e?.message || e));
@@ -144,6 +151,7 @@ export const BrandingPage = () => {
 
       {error && <div className="error">{error}</div>}
       {success && <div className="ok">{success}</div>}
+      {sourceMode === 'demo' ? <div className="demo-note">当前展示的是演示品牌数据，真实品牌配置恢复后会自动替换。</div> : null}
 
       <div className="data-source-note">
         数据来源：品牌页优先读取真实接口 `/api/admin/branding`，保存时会同步写回移动端与 PC 端配置；当接口不可用时，页面会回退到本地示例数据并明确提示。

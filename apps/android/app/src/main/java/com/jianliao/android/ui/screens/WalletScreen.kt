@@ -16,18 +16,30 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.jianliao.android.core.ServiceLocator
-import com.jianliao.android.data.repo.WalletSummary
+import com.jianliao.android.ui.components.AsyncScreenState
+import com.jianliao.android.ui.components.DataSourceNoticeCard
+import com.jianliao.android.ui.components.EmptyStateCard
+import com.jianliao.android.ui.components.ErrorStateCard
+import com.jianliao.android.ui.components.LoadingStateCard
+import com.jianliao.android.ui.components.rememberAsyncScreenState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletScreen(onBack: () -> Unit) {
-    val summary = produceState<WalletSummary?>(initialValue = null) {
-        value = ServiceLocator.walletRepository.getWalletSummary()
-    }.value
+    var reloadToken by rememberSaveable { mutableStateOf(0) }
+    val screenState = rememberAsyncScreenState(
+        key = reloadToken,
+        errorMessage = "加载钱包失败"
+    ) {
+        ServiceLocator.walletRepository.getWalletSummary()
+    }
 
     Scaffold(
         topBar = {
@@ -45,30 +57,68 @@ fun WalletScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("余额总览", style = MaterialTheme.typography.titleMedium)
-                        Text(summary?.balance ?: "--", style = MaterialTheme.typography.headlineMedium)
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Text("累计收入 ${summary?.totalIncome ?: "--"}")
-                            Text("累计支出 ${summary?.totalExpense ?: "--"}")
-                        }
-                    }
+                Button(onClick = { reloadToken += 1 }) {
+                    Text("重新加载")
                 }
             }
-            items(summary?.records.orEmpty()) { record ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(record.title, style = MaterialTheme.typography.titleSmall)
-                        Text(record.amount, style = MaterialTheme.typography.bodyLarge)
-                        Text(record.status, style = MaterialTheme.typography.bodyMedium)
-                        Text(record.timestamp, style = MaterialTheme.typography.bodySmall)
+            when (screenState) {
+                AsyncScreenState.Loading -> item {
+                    LoadingStateCard("正在加载钱包数据...")
+                }
+
+                is AsyncScreenState.Error -> item {
+                    ErrorStateCard(
+                        title = "钱包加载失败",
+                        message = screenState.message,
+                        actionLabel = "重试",
+                        onAction = { reloadToken += 1 }
+                    )
+                }
+
+                is AsyncScreenState.Success -> {
+                    val result = screenState.result
+                    val summary = result.data
+                    item {
+                        DataSourceNoticeCard(result)
+                    }
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("余额总览", style = MaterialTheme.typography.titleMedium)
+                                Text(summary.balance, style = MaterialTheme.typography.headlineMedium)
+                                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    Text("累计收入 ${summary.totalIncome}")
+                                    Text("累计支出 ${summary.totalExpense}")
+                                }
+                            }
+                        }
+                    }
+                    if (summary.records.isEmpty()) {
+                        item {
+                            EmptyStateCard(
+                                title = "暂无钱包记录",
+                                message = "当前账号还没有可展示的账单记录。",
+                                actionLabel = "重新加载",
+                                onAction = { reloadToken += 1 }
+                            )
+                        }
+                    } else {
+                        items(summary.records) { record ->
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(record.title, style = MaterialTheme.typography.titleSmall)
+                                    Text(record.amount, style = MaterialTheme.typography.bodyLarge)
+                                    Text(record.status, style = MaterialTheme.typography.bodyMedium)
+                                    Text(record.timestamp, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getFallbackBranding, loadBranding, resolveBrandingGroup } from '../api/branding';
 import { ApiError, apiPost } from '../api/client';
+import { getErrorMessage } from '../api/loadable';
 import RegisterPage from '../components/RegisterPage';
 import { hasAccessToken, setAccessToken } from '../state/session';
 
@@ -19,15 +20,17 @@ export default function RegisterEntryPage() {
   const [brand, setBrand] = React.useState(() => getFallbackBranding(platformGroup));
   const [submitting, setSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
 
     setBrand(getFallbackBranding(platformGroup));
 
-    void loadBranding(location.pathname).then((nextBrand) => {
+    void loadBranding(location.pathname).then((result) => {
       if (!cancelled) {
-        setBrand(nextBrand);
+        setBrand(result.data);
+        setNoticeMessage(result.notice || null);
       }
     });
 
@@ -46,6 +49,7 @@ export default function RegisterEntryPage() {
       platformGroup={platformGroup}
       isSubmitting={submitting}
       errorMessage={errorMessage}
+      noticeMessage={noticeMessage}
       onEnter={async ({ account, password, nickname }) => {
         if (!account || !password || !nickname) {
           setErrorMessage('请填写账号、密码和昵称');
@@ -63,14 +67,19 @@ export default function RegisterEntryPage() {
             platform: 'H5',
             nickname
           });
-          setAccessToken(payload.accessToken || 'demo-access-token');
+          if (!payload.accessToken?.trim()) {
+            setErrorMessage('注册接口未返回有效凭证');
+            return;
+          }
+          setAccessToken(payload.accessToken);
           navigate('/h5/messages');
         } catch (error) {
           if (error instanceof ApiError && error.status === 429) {
             setErrorMessage('注册过于频繁，请稍后重试');
+          } else if (error instanceof ApiError && error.status === 403) {
+            setErrorMessage('当前环境不允许注册，请联系管理员');
           } else {
-            setAccessToken('demo-access-token');
-            navigate('/h5/messages');
+            setErrorMessage(getErrorMessage(error, '注册失败，请稍后重试'));
           }
         } finally {
           setSubmitting(false);

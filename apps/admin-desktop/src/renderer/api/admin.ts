@@ -27,6 +27,15 @@ export type AuditAction = {
   createdAt: string;
 };
 
+export type Announcement = {
+  id: string;
+  title: string;
+  content: string;
+  status: string;
+  createdBy: string;
+  createdAt: string;
+};
+
 export type GroupProductOrder = {
   id: string;
   conversationId: string;
@@ -133,6 +142,7 @@ export const resolveReport = (id: string) =>
   request(`/api/admin/reports/${id}/resolve`, { method: 'POST' });
 export const createAnnouncement = (input: { title: string; content: string }) =>
   request('/api/admin/announcements', { method: 'POST', body: input });
+export const getAnnouncements = () => request<Announcement[]>('/api/admin/announcements');
 export const getAuditActions = () => request<AuditAction[]>('/api/admin/audit-actions');
 export const getBrandingConfigs = () => request<BrandingRow[]>('/api/admin/branding');
 export const updateBranding = (group: BrandingPlatformGroup, input: UpdateBrandingInput) =>

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { fetchActivityFeed, type ActivityPreview } from '../api/profile';
+import DataModeNotice from '../components/DataModeNotice';
+import { getErrorMessage } from '../api/loadable';
+import { loadActivityFeed, type ActivityPreview } from '../api/profile';
 
 const discoverLinks = [
   { title: '系统通知', to: '/h5/system-notice', description: '查看后台公告、风控与处理结果。' },
@@ -11,14 +13,24 @@ const discoverLinks = [
 
 export default function DiscoverPage() {
   const [activities, setActivities] = React.useState<ActivityPreview[]>([]);
+  const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
-    void fetchActivityFeed().then((rows) => {
-      if (!cancelled) {
-        setActivities(rows);
-      }
-    });
+    void loadActivityFeed()
+      .then((result) => {
+        if (!cancelled) {
+          setActivities(result.data);
+          setNoticeMessage(result.notice || null);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setActivities([]);
+          setErrorMessage(getErrorMessage(error, '活动加载失败，请稍后重试'));
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -31,6 +43,8 @@ export default function DiscoverPage() {
         <h1>发现</h1>
       </header>
       <div className="placeholder-list discover-page">
+        {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
+        {noticeMessage ? <DataModeNotice message={noticeMessage} /> : null}
         <section className="shortcut-grid">
           {discoverLinks.map((link) => (
             <Link key={link.to} className="shortcut-card" to={link.to}>

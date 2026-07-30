@@ -7,6 +7,21 @@ struct WalletView: View {
   var body: some View {
     List {
       Section {
+        VStack(alignment: .leading, spacing: 10) {
+          SourceBadge(isLive: profile.walletSource.isLive)
+          if let issue = profile.issue(for: .wallet) {
+            Text("钱包接口失败，当前展示演示兜底：\(issue)")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          } else {
+            Text("当前展示钱包实时数据。")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+
+      Section {
         VStack(alignment: .leading, spacing: 8) {
           Text("可提现余额")
             .font(.footnote)
@@ -28,7 +43,7 @@ struct WalletView: View {
       }
 
       Section("说明") {
-        Text("当前页面已接入轻量钱包接口，保留现有用户端结构，仅将资金概览切换为实时数据。")
+        Text("真实接口优先；若接口异常，会自动切到演示数据，保证钱包入口与状态提示可继续验收。")
           .font(.footnote)
           .foregroundStyle(.secondary)
       }

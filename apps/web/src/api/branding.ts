@@ -1,3 +1,5 @@
+import { withDemoFallback, type LoadableData } from './loadable';
+
 export type BrandingPlatformGroup = 'mobile' | 'pc';
 
 export type BrandingRow = {
@@ -59,25 +61,26 @@ const normalizeBrandingRows = (payload: unknown): BrandingRow[] => {
 export async function loadBranding(
   pathname: string,
   fetcher: typeof fetch = fetch
-): Promise<BrandingRow> {
+): Promise<LoadableData<BrandingRow>> {
   const group = resolveBrandingGroup(pathname);
+  return withDemoFallback(
+    async () => {
+      const response = await fetcher(`/api/public/branding?group=${group}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json'
+        }
+      });
 
-  try {
-    const response = await fetcher(`/api/public/branding?group=${group}`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json'
+      if (!response.ok) {
+        throw new Error(`HTTP_${response.status}`);
       }
-    });
 
-    if (!response.ok) {
-      throw new Error(`HTTP_${response.status}`);
-    }
-
-    const payload = await response.json();
-    const rows = normalizeBrandingRows([payload]);
-    return rows[0] || getFallbackBranding(group);
-  } catch {
-    return getFallbackBranding(group);
-  }
+      const payload = await response.json();
+      const rows = normalizeBrandingRows([payload]);
+      return rows[0] || getFallbackBranding(group);
+    },
+    getFallbackBranding(group),
+    '品牌配置接口暂不可用，当前展示演示品牌。'
+  );
 }

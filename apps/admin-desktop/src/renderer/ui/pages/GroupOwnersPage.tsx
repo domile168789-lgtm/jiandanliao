@@ -55,6 +55,8 @@ export const GroupOwnersPage = () => {
     () => alerts.filter((alert) => alert.triggerType === 'MENTION').slice(0, 5),
     [alerts]
   );
+  const usingFallbackOwners = rows === FALLBACK_OWNERS || (!users.length && rows.length > 0);
+  const usingFallbackAlerts = mentionAlerts.length === 0;
 
   return (
     <section className="page-section">
@@ -72,6 +74,13 @@ export const GroupOwnersPage = () => {
       <div className="data-source-note">
         数据来源：群主页优先读取真实用户与机器人提醒接口；“负责群组数”等字段在当前阶段属于推导数据，用于补齐后台观察视角，不代表独立群主主数据表。
       </div>
+      {usingFallbackOwners || usingFallbackAlerts ? (
+        <div className="demo-note">
+          当前页包含演示数据：
+          {usingFallbackOwners ? ' 群主列表正在使用本地示例行。' : ''}
+          {usingFallbackAlerts ? ' 群内称呼提醒正在使用演示提醒。' : ''}
+        </div>
+      ) : null}
       <div className="dashboard-grid">
         <section className="panel">
           <div className="panel-header">

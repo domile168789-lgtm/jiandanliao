@@ -6,6 +6,21 @@ struct SystemNoticeView: View {
 
   var body: some View {
     List {
+      Section {
+        VStack(alignment: .leading, spacing: 10) {
+          SourceBadge(isLive: profile.noticesSource.isLive)
+          if let issue = profile.issue(for: .notices) {
+            Text("通知接口失败，当前展示本地兜底通知：\(issue)")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          } else {
+            Text("当前通知列表来自实时接口。")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+
       if profile.isRestricted {
         Section {
           Label("账号当前处于受限状态，请联系管理员处理。", systemImage: "exclamationmark.shield")
@@ -15,19 +30,16 @@ struct SystemNoticeView: View {
 
       Section("通知列表") {
         if profile.notices.isEmpty {
-          VStack(alignment: .center, spacing: 10) {
-            Image(systemName: "bell.slash")
-              .font(.system(size: 28))
-              .foregroundStyle(.secondary)
-            Text("暂无系统通知")
-              .font(.headline)
-            Text("当后台公告、风控结果或客户端提示接入后，会在这里统一展示。")
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-              .multilineTextAlignment(.center)
+          EmptyStateCard(
+            icon: "bell.slash",
+            title: "暂无系统通知",
+            message: "当后台公告、风控结果或客户端提示接入后，会在这里统一展示。",
+            actionTitle: "重新拉取"
+          ) {
+            Task {
+              await profile.refreshAll(phoneHint: auth.phone)
+            }
           }
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 24)
         } else {
           ForEach(profile.notices) { notice in
             VStack(alignment: .leading, spacing: 8) {

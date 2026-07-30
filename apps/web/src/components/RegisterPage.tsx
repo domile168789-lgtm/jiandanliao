@@ -6,6 +6,7 @@ type RegisterPageProps = {
   platformGroup: BrandingPlatformGroup;
   isSubmitting?: boolean;
   errorMessage?: string | null;
+  noticeMessage?: string | null;
   onEnter: (input: { account: string; password: string; nickname: string }) => void | Promise<void>;
   onSwitchToLogin: () => void;
 };
@@ -15,6 +16,7 @@ export default function RegisterPage({
   platformGroup,
   isSubmitting = false,
   errorMessage = null,
+  noticeMessage = null,
   onEnter,
   onSwitchToLogin
 }: RegisterPageProps) {
@@ -91,6 +93,7 @@ export default function RegisterPage({
         </div>
 
         {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
+        {noticeMessage ? <p className="form-notice">{noticeMessage}</p> : null}
 
         <button
           className="primary-button"

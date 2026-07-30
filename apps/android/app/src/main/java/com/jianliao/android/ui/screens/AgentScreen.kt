@@ -15,18 +15,30 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.jianliao.android.core.ServiceLocator
-import com.jianliao.android.data.repo.AgentOverview
+import com.jianliao.android.ui.components.AsyncScreenState
+import com.jianliao.android.ui.components.DataSourceNoticeCard
+import com.jianliao.android.ui.components.EmptyStateCard
+import com.jianliao.android.ui.components.ErrorStateCard
+import com.jianliao.android.ui.components.LoadingStateCard
+import com.jianliao.android.ui.components.rememberAsyncScreenState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgentScreen(onBack: () -> Unit) {
-    val overview = produceState<AgentOverview?>(initialValue = null) {
-        value = ServiceLocator.agentRepository.getAgentOverview()
-    }.value
+    var reloadToken by rememberSaveable { mutableStateOf(0) }
+    val screenState = rememberAsyncScreenState(
+        key = reloadToken,
+        errorMessage = "加载代理信息失败"
+    ) {
+        ServiceLocator.agentRepository.getAgentOverview()
+    }
 
     Scaffold(
         topBar = {
@@ -44,38 +56,83 @@ fun AgentScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("代理身份", style = MaterialTheme.typography.titleMedium)
-                        Text(overview?.level ?: "--", style = MaterialTheme.typography.headlineSmall)
-                        Text("邀请码 ${overview?.inviteCode ?: "--"}")
-                        Text("团队规模 ${overview?.teamSize ?: 0} 人")
-                    }
+                Button(onClick = { reloadToken += 1 }) {
+                    Text("重新加载")
                 }
             }
-            items(overview?.metrics.orEmpty()) { metric ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(metric.label, style = MaterialTheme.typography.labelLarge)
-                        Text(metric.value, style = MaterialTheme.typography.titleMedium)
-                    }
+            when (screenState) {
+                AsyncScreenState.Loading -> item {
+                    LoadingStateCard("正在加载代理概览...")
                 }
-            }
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text("运营提示", style = MaterialTheme.typography.titleSmall)
-                        overview?.tips.orEmpty().forEach { tip ->
-                            Text("- $tip", style = MaterialTheme.typography.bodyMedium)
+
+                is AsyncScreenState.Error -> item {
+                    ErrorStateCard(
+                        title = "代理信息加载失败",
+                        message = screenState.message,
+                        actionLabel = "重试",
+                        onAction = { reloadToken += 1 }
+                    )
+                }
+
+                is AsyncScreenState.Success -> {
+                    val result = screenState.result
+                    val overview = result.data
+                    item {
+                        DataSourceNoticeCard(result)
+                    }
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("代理身份", style = MaterialTheme.typography.titleMedium)
+                                Text(overview.level, style = MaterialTheme.typography.headlineSmall)
+                                Text("邀请码 ${overview.inviteCode}")
+                                Text("团队规模 ${overview.teamSize} 人")
+                            }
+                        }
+                    }
+                    if (overview.metrics.isEmpty()) {
+                        item {
+                            EmptyStateCard(
+                                title = "暂无代理指标",
+                                message = "当前账号还没有可展示的代理指标。",
+                                actionLabel = "重新加载",
+                                onAction = { reloadToken += 1 }
+                            )
+                        }
+                    } else {
+                        items(overview.metrics) { metric ->
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(metric.label, style = MaterialTheme.typography.labelLarge)
+                                    Text(metric.value, style = MaterialTheme.typography.titleMedium)
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        if (overview.tips.isEmpty()) {
+                            EmptyStateCard(
+                                title = "暂无运营提示",
+                                message = "当前没有额外的代理运营提示。"
+                            )
+                        } else {
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text("运营提示", style = MaterialTheme.typography.titleSmall)
+                                    overview.tips.forEach { tip ->
+                                        Text("- $tip", style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -6,6 +6,21 @@ struct AgentView: View {
 
   var body: some View {
     List {
+      Section {
+        VStack(alignment: .leading, spacing: 10) {
+          SourceBadge(isLive: profile.agentSource.isLive)
+          if let issue = profile.issue(for: .agent) {
+            Text("代理接口失败，当前展示演示兜底：\(issue)")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          } else {
+            Text("当前等级、团队人数和佣金比例均来自实时接口。")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+
       Section("代理概览") {
         LabeledContent("当前等级", value: profile.agent.level)
         LabeledContent("直属成员", value: "\(profile.agent.teamCount)")

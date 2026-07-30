@@ -30,6 +30,7 @@ describe('adminRoutes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.DATABASE_URL = 'mysql://root:root@mysql:3306/jianliao';
+    process.env.JWT_SECRET = '12345678901234567890123456789012';
   });
 
   it('rejects unauthenticated admin request', async () => {
@@ -79,6 +80,53 @@ describe('adminRoutes', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual([
+      {
+        id: 'u1',
+        phone: '85510000001',
+        nickname: '演示用户1',
+        status: 'ACTIVE',
+        updatedAt: '2026-07-29 00:00:00'
+      }
+    ]);
+  });
+
+  it('supports real admin login and bearer token access', async () => {
+    executeMock.mockResolvedValueOnce([
+      [{ id: 'u1', phone: '85510000001', nickname: '演示用户1', status: 'ACTIVE', updatedAt: '2026-07-29 00:00:00' }]
+    ]);
+
+    const app = Fastify();
+    await app.register(adminRoutes, { prefix: '/api' });
+
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: {
+        username: 'superadmin',
+        password: 'change-me-superadmin'
+      }
+    });
+
+    expect(loginRes.statusCode).toBe(200);
+    expect(loginRes.json()).toEqual({
+      accessToken: expect.any(String),
+      admin: {
+        id: '10001',
+        role: 'SUPER_ADMIN',
+        username: 'superadmin'
+      }
+    });
+
+    const usersRes = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users',
+      headers: {
+        authorization: `Bearer ${loginRes.json().accessToken}`
+      }
+    });
+
+    expect(usersRes.statusCode).toBe(200);
+    expect(usersRes.json()).toEqual([
       {
         id: 'u1',
         phone: '85510000001',
@@ -351,6 +399,45 @@ describe('adminRoutes', () => {
         expect.any(String)
       ]
     );
+  });
+
+  it('lists announcements for authorized admin', async () => {
+    executeMock.mockResolvedValueOnce([
+      [
+        {
+          id: 'notice-1',
+          title: '系统维护',
+          content: '今晚 10 点开始维护',
+          status: 'PUBLISHED',
+          createdBy: '10001',
+          createdAt: '2026-07-30 10:00:00'
+        }
+      ]
+    ]);
+
+    const app = Fastify();
+    await app.register(adminRoutes, { prefix: '/api' });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/announcements',
+      headers: {
+        'x-admin-role': 'AUDITOR',
+        'x-admin-id': '10003'
+      }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual([
+      {
+        id: 'notice-1',
+        title: '系统维护',
+        content: '今晚 10 点开始维护',
+        status: 'PUBLISHED',
+        createdBy: '10001',
+        createdAt: '2026-07-30 10:00:00'
+      }
+    ]);
   });
 
   it('rejects invalid announcement payload', async () => {

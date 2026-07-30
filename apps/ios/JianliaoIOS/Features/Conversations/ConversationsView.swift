@@ -13,16 +13,58 @@ struct ConversationsView: View {
 
   var body: some View {
     NavigationStack {
-      List(conversations) { c in
-        NavigationLink(value: c) {
-          VStack(alignment: .leading, spacing: 4) {
-            Text(title(for: c))
-              .font(.headline)
-            if let last = c.lastMessage, !last.isEmpty {
-              Text(last)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+      List {
+        if let errorText, conversations.isEmpty, !isLoading {
+          Section {
+            EmptyStateCard(
+              icon: "wifi.exclamationmark",
+              title: "会话加载失败",
+              message: errorText,
+              actionTitle: "重试"
+            ) {
+              Task {
+                await reload()
+              }
+            }
+          }
+        } else if conversations.isEmpty, !isLoading {
+          Section {
+            EmptyStateCard(
+              icon: "message.badge",
+              title: "还没有会话",
+              message: "先创建一个单聊，或使用另一台设备给当前账号发消息。",
+              actionTitle: "新建单聊"
+            ) {
+              showNewDM = true
+            }
+          }
+        } else {
+          if let errorText {
+            Section {
+              StatusBanner(tone: .warning, title: "会话刷新失败", message: errorText, actionTitle: "重试") {
+                Task {
+                  await reload()
+                }
+              }
+            }
+          }
+
+          ForEach(conversations) { c in
+            NavigationLink(value: c) {
+              VStack(alignment: .leading, spacing: 4) {
+                Text(title(for: c))
+                  .font(.headline)
+                if let last = c.lastMessage, !last.isEmpty {
+                  Text(last)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                } else {
+                  Text("暂无最近消息")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+              }
             }
           }
         }
@@ -60,11 +102,6 @@ struct ConversationsView: View {
         if isLoading {
           ProgressView().progressViewStyle(.circular)
         }
-      }
-      .alert("加载失败", isPresented: Binding(get: { errorText != nil }, set: { if !$0 { errorText = nil } })) {
-        Button("确定", role: .cancel) {}
-      } message: {
-        Text(errorText ?? "")
       }
       .sheet(isPresented: $showNewDM) {
         NavigationStack {
@@ -105,6 +142,7 @@ struct ConversationsView: View {
   private func reload() async {
     isLoading = true
     defer { isLoading = false }
+    errorText = nil
     do {
       conversations = try await auth.listConversations()
         .sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }

@@ -21,6 +21,7 @@ export const LoginPage = (props: { onLogin: (s: AdminSession) => void }) => {
       }>('/admin/login', {
         method: 'POST',
         baseUrl: nextBaseUrl,
+        auth: false,
         body: {
           username: username.trim(),
           password

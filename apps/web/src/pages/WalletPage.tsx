@@ -1,17 +1,29 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { fetchWalletSummary, type WalletSummary } from '../api/profile';
+import DataModeNotice from '../components/DataModeNotice';
+import { getErrorMessage } from '../api/loadable';
+import { loadWalletSummary, type WalletSummary } from '../api/profile';
 
 export default function WalletPage() {
   const [wallet, setWallet] = React.useState<WalletSummary | null>(null);
+  const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
-    void fetchWalletSummary().then((nextWallet) => {
-      if (!cancelled) {
-        setWallet(nextWallet);
-      }
-    });
+    void loadWalletSummary()
+      .then((result) => {
+        if (!cancelled) {
+          setWallet(result.data);
+          setNoticeMessage(result.notice || null);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setWallet(null);
+          setErrorMessage(getErrorMessage(error, '钱包加载失败，请稍后重试'));
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -30,6 +42,8 @@ export default function WalletPage() {
         </Link>
       </header>
       <div className="placeholder-list">
+        {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
+        {noticeMessage ? <DataModeNotice message={noticeMessage} /> : null}
         <section className="stats-grid">
           <article className="stat-card">
             <strong>{wallet ? `${wallet.currency} ${wallet.balance.toFixed(2)}` : '--'}</strong>

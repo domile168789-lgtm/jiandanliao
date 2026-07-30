@@ -1,25 +1,8 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { listMessages, sendTextMessage, type MessageRow } from '../api/chat';
-
-const getFallbackMessages = (conversationId: string): MessageRow[] => [
-  {
-    id: `${conversationId}-system`,
-    conversationId,
-    senderId: null,
-    type: 'SYSTEM',
-    body: { text: '欢迎进入当前会话，演示环境下消息会优先本地展示。' },
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: `${conversationId}-welcome`,
-    conversationId,
-    senderId: 'peer',
-    type: 'TEXT',
-    body: { text: '你好，这里是完整版 H5 聊天页入口。' },
-    createdAt: new Date().toISOString()
-  }
-];
+import DataModeNotice from '../components/DataModeNotice';
+import { loadMessages, sendTextMessage, type MessageRow } from '../api/chat';
+import { getErrorMessage } from '../api/loadable';
 
 const getMessageText = (row: MessageRow) => {
   if (typeof row.body.text === 'string' && row.body.text) return row.body.text;
@@ -37,19 +20,25 @@ export default function ChatPage() {
   const [loading, setLoading] = React.useState(true);
   const [draft, setDraft] = React.useState('');
   const [sending, setSending] = React.useState(false);
+  const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
 
     setLoading(true);
-    void listMessages(conversationId)
-      .then((rows) => {
+    setNoticeMessage(null);
+    setErrorMessage(null);
+    void loadMessages(conversationId)
+      .then((result) => {
         if (cancelled) return;
-        setMessages(rows.length ? rows : getFallbackMessages(conversationId));
+        setMessages(result.data);
+        setNoticeMessage(result.notice || null);
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return;
-        setMessages(getFallbackMessages(conversationId));
+        setMessages([]);
+        setErrorMessage(getErrorMessage(error, '消息加载失败，请重新登录后重试'));
       })
       .finally(() => {
         if (cancelled) return;
@@ -78,14 +67,17 @@ export default function ChatPage() {
     setMessages((current) => [...current, optimisticMessage]);
     setDraft('');
     setSending(true);
+    setErrorMessage(null);
 
     try {
       const created = await sendTextMessage(conversationId, nextDraft);
       if (created) {
         setMessages((current) => [...current.filter((item) => item.id !== optimisticMessage.id), created]);
       }
-    } catch {
-      // Keep optimistic message in demo mode.
+    } catch (error) {
+      setMessages((current) => current.filter((item) => item.id !== optimisticMessage.id));
+      setDraft(nextDraft);
+      setErrorMessage(getErrorMessage(error, '发送失败，请稍后重试'));
     } finally {
       setSending(false);
     }
@@ -105,6 +97,9 @@ export default function ChatPage() {
 
       <section className="chat-feed" aria-label="聊天消息">
         {loading ? <p className="conversation-state">消息加载中...</p> : null}
+        {!loading && errorMessage ? <div className="form-error">{errorMessage}</div> : null}
+        {!loading && noticeMessage ? <DataModeNotice message={noticeMessage} /> : null}
+        {!loading && !errorMessage && messages.length === 0 ? <p className="conversation-state">暂无消息</p> : null}
         {!loading
           ? messages.map((message) => {
               const isSelf = message.senderId === 'self';

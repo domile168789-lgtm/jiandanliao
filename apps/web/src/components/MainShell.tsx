@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { listConversations, type ConversationRow } from '../api/chat';
+import { loadConversations, type ConversationRow } from '../api/chat';
+import { getErrorMessage } from '../api/loadable';
+import DataModeNotice from './DataModeNotice';
 
 const shortcuts = [
   { label: '系统通知', to: '/h5/system-notice', hint: '查看公告与风控结果' },
@@ -11,18 +13,22 @@ const shortcuts = [
 export default function MainShell() {
   const [rows, setRows] = React.useState<ConversationRow[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [noticeMessage, setNoticeMessage] = React.useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
 
-    void listConversations()
-      .then((nextRows) => {
+    void loadConversations()
+      .then((result) => {
         if (cancelled) return;
-        setRows(nextRows);
+        setRows(result.data);
+        setNoticeMessage(result.notice || null);
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return;
         setRows([]);
+        setErrorMessage(getErrorMessage(error, '会话加载失败，请重新登录后重试'));
       })
       .finally(() => {
         if (cancelled) return;
@@ -57,6 +63,8 @@ export default function MainShell() {
 
       <section className="placeholder-list" aria-label="消息列表">
         {loading ? <p className="conversation-state">会话加载中...</p> : null}
+        {!loading && errorMessage ? <div className="form-error">{errorMessage}</div> : null}
+        {!loading && noticeMessage ? <DataModeNotice message={noticeMessage} /> : null}
 
         {!loading && rows.length === 0 ? <p className="conversation-state">暂无会话</p> : null}
 

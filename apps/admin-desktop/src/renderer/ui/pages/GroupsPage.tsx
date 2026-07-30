@@ -189,6 +189,8 @@ export const GroupsPage = () => {
   const rows = useMemo(() => buildGroups(users, orders, alerts, adTasks), [users, orders, alerts, adTasks]);
   const latestAlerts = useMemo(() => alerts.slice(0, 5), [alerts]);
   const latestTasks = useMemo(() => adTasks.slice(0, 8), [adTasks]);
+  const hasFallbackGroups = rows.some((row) => row.source === 'fallback');
+  const usingFallbackAlerts = latestAlerts.length === 0;
   const taskSummary = useMemo(
     () => ({
       total: adTasks.length,
@@ -279,6 +281,13 @@ export const GroupsPage = () => {
       <div className="data-source-note">
         数据来源：群广告任务、购买记录和机器人提醒优先读取真实接口；群组基础信息在缺少独立群组接口时会结合真实会话 ID、用户数据和演示数据推导展示。
       </div>
+      {hasFallbackGroups || usingFallbackAlerts ? (
+        <div className="demo-note">
+          当前页包含演示数据：
+          {hasFallbackGroups ? ' 群组基础信息包含演示群组。' : ''}
+          {usingFallbackAlerts ? ' 机器人最新消息提示正在展示演示提醒。' : ''}
+        </div>
+      ) : null}
       <div className="dashboard-grid">
         <section className="panel">
           <div className="panel-header">

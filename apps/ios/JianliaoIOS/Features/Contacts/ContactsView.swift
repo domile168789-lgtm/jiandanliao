@@ -27,11 +27,35 @@ struct ContactsView: View {
         }
 
         Section("最近联系人") {
-          if directMessages.isEmpty, !isLoading {
-            Text("还没有单聊联系人，先从右上角创建一个会话。")
-              .font(.footnote)
-              .foregroundStyle(.secondary)
+          if let errorText, directMessages.isEmpty, !isLoading {
+            EmptyStateCard(
+              icon: "person.crop.circle.badge.exclamationmark",
+              title: "联系人加载失败",
+              message: errorText,
+              actionTitle: "重试"
+            ) {
+              Task {
+                await reload()
+              }
+            }
+          } else if directMessages.isEmpty, !isLoading {
+            EmptyStateCard(
+              icon: "person.2.slash",
+              title: "暂无最近联系人",
+              message: "先创建一个单聊，通讯录会在这里保留最近联系入口。",
+              actionTitle: "发起单聊"
+            ) {
+              showCreateSheet = true
+            }
           } else {
+            if let errorText {
+              StatusBanner(tone: .warning, title: "联系人刷新失败", message: errorText, actionTitle: "重试") {
+                Task {
+                  await reload()
+                }
+              }
+            }
+
             ForEach(directMessages) { conversation in
               NavigationLink {
                 ChatView(conversation: conversation)
@@ -66,11 +90,6 @@ struct ContactsView: View {
           ProgressView()
         }
       }
-      .alert("操作失败", isPresented: Binding(get: { errorText != nil }, set: { if !$0 { errorText = nil } })) {
-        Button("确定", role: .cancel) {}
-      } message: {
-        Text(errorText ?? "")
-      }
       .sheet(isPresented: $showCreateSheet) {
         NavigationStack {
           Form {
@@ -99,6 +118,7 @@ struct ContactsView: View {
   private func reload() async {
     isLoading = true
     defer { isLoading = false }
+    errorText = nil
 
     do {
       directMessages = try await auth.listConversations()
@@ -131,4 +151,3 @@ struct ContactsView: View {
     return "单聊会话"
   }
 }
-
