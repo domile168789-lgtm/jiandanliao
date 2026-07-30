@@ -45,12 +45,29 @@ const productionRoutes: Route[] = [
   'branding'
 ];
 
+const PREVIEW_QUERY_KEY = 'preview';
+const PREVIEW_QUERY_VALUE = 'demo';
+const PREVIEW_SESSION: AdminSession = {
+  id: 'preview-admin',
+  role: 'SUPER_ADMIN',
+  username: 'preview-superadmin',
+  accessToken: 'preview-admin-token',
+  baseUrl: '/api'
+};
+
 export const App = () => {
   const [session, setSession] = useState<AdminSession | null>(() => loadSession());
   const [route, setRoute] = useState<Route>('dashboard');
 
   useEffect(() => {
     saveSession(session);
+  }, [session]);
+
+  useEffect(() => {
+    if (session) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(PREVIEW_QUERY_KEY) !== PREVIEW_QUERY_VALUE) return;
+    setSession(PREVIEW_SESSION);
   }, [session]);
 
   const content = useMemo(() => {

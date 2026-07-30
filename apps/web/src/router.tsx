@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import DownloadPage from './components/DownloadPage';
-import { hasAccessToken } from './state/session';
+import { hasAccessToken, setAccessToken } from './state/session';
 import AgentPage from './pages/AgentPage';
 import ChatPage from './pages/ChatPage';
 import ContactsPage from './pages/ContactsPage';
@@ -33,9 +33,25 @@ export const appRoutes = [
 
 const tabRoutes = appRoutes.slice(0, 4);
 const detailRoutes = appRoutes.slice(4);
+const PREVIEW_QUERY_KEY = 'preview';
+const PREVIEW_QUERY_VALUE = 'demo';
+const PREVIEW_ACCESS_TOKEN = 'preview-demo-token';
+
+function isPreviewMode(search: string) {
+  const params = new URLSearchParams(search);
+  return params.get(PREVIEW_QUERY_KEY) === PREVIEW_QUERY_VALUE;
+}
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  return hasAccessToken() ? <>{children}</> : <Navigate to="/h5/login" replace />;
+  const search = typeof window === 'undefined' ? '' : window.location.search;
+  if (hasAccessToken()) {
+    return <>{children}</>;
+  }
+  if (isPreviewMode(search)) {
+    setAccessToken(PREVIEW_ACCESS_TOKEN);
+    return <>{children}</>;
+  }
+  return <Navigate to={`/h5/login${search}`} replace />;
 }
 
 const toNestedPath = (path: string) => path.replace(/^\//, '');
