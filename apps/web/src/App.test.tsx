@@ -216,6 +216,25 @@ describe('App route entry', () => {
     );
   });
 
+  it('creates and filters tags locally', async () => {
+    renderAt('/h5/contacts/tags', { token: 'demo-token' });
+
+    fireEvent.change(await screen.findByLabelText('搜索标签或联系人'), {
+      target: { value: '安全' }
+    });
+    expect(screen.getByText('安全与风控')).toBeInTheDocument();
+    expect(screen.queryByText('渠道合作')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('新标签名称'), {
+      target: { value: '重点跟进' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: '新建标签' }));
+    fireEvent.change(screen.getByLabelText('搜索标签或联系人'), {
+      target: { value: '' }
+    });
+    expect(screen.getByText('重点跟进')).toBeInTheDocument();
+  });
+
   it('opens the discover service pages', async () => {
     const routes = [
       { path: '/h5/discover/moments', heading: '朋友圈' },
@@ -231,6 +250,19 @@ describe('App route entry', () => {
     }
   });
 
+  it('publishes and likes a moment locally', async () => {
+    renderAt('/h5/discover/moments', { token: 'demo-token' });
+
+    fireEvent.change(await screen.findByLabelText('动态内容'), {
+      target: { value: '今天把四个 Tab 的剩余交互补齐了' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: '发布动态' }));
+    expect(screen.getByText('今天把四个 Tab 的剩余交互补齐了')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: /赞/ })[0]);
+    expect(screen.getAllByRole('button', { name: /赞/ })[0]).toHaveTextContent('1 赞');
+  });
+
   it('filters search hub results', async () => {
     renderAt('/h5/discover/search', { token: 'demo-token' });
 
@@ -239,6 +271,14 @@ describe('App route entry', () => {
     });
     expect(screen.getByRole('link', { name: /钱包/ })).toHaveAttribute('href', '/h5/wallet');
     expect(screen.queryByRole('link', { name: /商务对接/ })).not.toBeInTheDocument();
+  });
+
+  it('simulates scan result routing', async () => {
+    renderAt('/h5/discover/scan', { token: 'demo-token' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '收付款码' }));
+    expect(screen.getByText('识别到收付款码')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '前往钱包' })).toHaveAttribute('href', '/h5/wallet');
   });
 
   it('renders wechat-style discover rows', async () => {
