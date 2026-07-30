@@ -9,7 +9,7 @@ private struct BrandingDTO: Decodable {
 
 @MainActor
 final class BrandingStore: ObservableObject {
-  @Published private(set) var projectName: String = "柬聊"
+  @Published private(set) var projectName: String = "柬单聊"
   @Published private(set) var logoURL: URL?
   @Published private(set) var themeAssetURL: URL?
   @Published private(set) var loadError: String?
@@ -36,7 +36,7 @@ final class BrandingStore: ObservableObject {
       }
 
       let branding = try JSONDecoder.api.decode(BrandingDTO.self, from: data)
-      projectName = branding.projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "柬聊" : branding.projectName
+      projectName = branding.projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "柬单聊" : branding.projectName
       logoURL = Self.normalizeURL(branding.logoUrl)
       themeAssetURL = Self.normalizeURL(branding.themeAssetUrl)
     } catch {
@@ -45,7 +45,7 @@ final class BrandingStore: ObservableObject {
   }
 
   private func applyFallback(message: String) {
-    projectName = "柬聊"
+    projectName = "柬单聊"
     logoURL = nil
     themeAssetURL = nil
     loadError = message

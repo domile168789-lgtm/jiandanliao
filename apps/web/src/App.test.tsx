@@ -8,14 +8,14 @@ import App from './App';
 const brandingResponse = {
   mobile: {
     platformGroup: 'mobile',
-    projectName: '柬聊移动品牌',
+    projectName: '柬单聊移动品牌',
     logoUrl: null,
     themeAssetUrl: 'https://assets.jianliao.local/mobile-theme.png',
     holidayThemeAssetUrl: 'https://assets.jianliao.local/mobile-horse-theme.png'
   },
   pc: {
     platformGroup: 'pc',
-    projectName: '柬聊 PC 品牌',
+    projectName: '柬单聊 PC 品牌',
     logoUrl: null,
     themeAssetUrl: 'https://assets.jianliao.local/pc-theme.png',
     holidayThemeAssetUrl: null
@@ -74,10 +74,10 @@ describe('App route entry', () => {
 
   it('redirects unauthenticated /h5/messages to login and allows switching to register then back', async () => {
     renderAt('/h5/messages');
-    expect(await screen.findByText('柬聊移动品牌')).toBeInTheDocument();
+    expect(await screen.findByText('柬单聊移动品牌')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '注册账号' })).toBeInTheDocument();
-    expect(screen.getByRole('banner', { name: '顶部品牌区' })).toHaveTextContent('柬聊移动品牌');
+    expect(screen.getByRole('banner', { name: '顶部品牌区' })).toHaveTextContent('柬单聊移动品牌');
     expect(screen.getByRole('region', { name: '中部登录区' })).toBeInTheDocument();
     expect(screen.getByRole('contentinfo', { name: '底部辅助区' })).toBeInTheDocument();
     expect(screen.getByLabelText('账号')).toHaveAttribute('placeholder', '请输入账号');
@@ -137,21 +137,21 @@ describe('App route entry', () => {
   it('maps /mobile to mobile branding and /PC to pc branding', async () => {
     renderAt('/mobile');
 
-    expect(await screen.findByText('柬聊移动品牌')).toBeInTheDocument();
-    expect(screen.getByRole('banner', { name: '顶部品牌区' })).toHaveTextContent('柬聊移动品牌');
+    expect(await screen.findByText('柬单聊移动品牌')).toBeInTheDocument();
+    expect(screen.getByRole('banner', { name: '顶部品牌区' })).toHaveTextContent('柬单聊移动品牌');
 
     cleanup();
     renderAt('/PC');
 
-    expect(await screen.findByText('柬聊 PC 品牌')).toBeInTheDocument();
-    expect(screen.getByRole('banner', { name: '顶部品牌区' })).toHaveTextContent('柬聊 PC 品牌');
+    expect(await screen.findByText('柬单聊 PC 品牌')).toBeInTheDocument();
+    expect(screen.getByRole('banner', { name: '顶部品牌区' })).toHaveTextContent('柬单聊 PC 品牌');
   });
 
   it('renders login page by default on root path', async () => {
     renderAt('/');
 
     expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
-    expect(await screen.findByText('柬聊 PC 品牌')).toBeInTheDocument();
+    expect(await screen.findByText('柬单聊 PC 品牌')).toBeInTheDocument();
   });
 
   it('keeps login on page when auth request fails and does not write demo token', async () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 describe('admin console baseline', () => {
-  it('desktop admin remains the single console with runtime base url and admin identity headers', () => {
+  it('desktop admin remains the single console with runtime base url and bearer auth login flow', () => {
     const desktopClient = readFileSync('apps/admin-desktop/src/renderer/api/client.ts', 'utf-8');
     const desktopLogin = readFileSync(
       'apps/admin-desktop/src/renderer/ui/pages/LoginPage.tsx',
@@ -10,11 +10,11 @@ describe('admin console baseline', () => {
     );
 
     expect(desktopClient).toContain('baseUrl?: string');
-    expect(desktopClient).toContain('x-admin-role');
-    expect(desktopClient).toContain('x-admin-id');
+    expect(desktopClient).toContain('Authorization');
+    expect(desktopClient).toContain('Bearer ${session.accessToken}');
     expect(desktopLogin).toContain('API Base URL');
-    expect(desktopLogin).toContain('x-admin-role');
-    expect(desktopLogin).toContain('x-admin-id');
+    expect(desktopLogin).toContain('/admin/login');
+    expect(desktopLogin).toContain('Bearer Token');
   });
 
   it('documents the single admin flow', () => {

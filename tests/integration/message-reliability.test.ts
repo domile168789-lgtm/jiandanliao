@@ -5,7 +5,8 @@ describe('message reliability', () => {
   it('guards duplicate read receipt handling', () => {
     const receiptRoutes = readFileSync('apps/api/src/modules/messages/receipt.routes.ts', 'utf-8');
     expect(receiptRoutes).toContain('already acknowledged');
-    expect(receiptRoutes).toContain("type: 'READ'");
+    expect(receiptRoutes).toContain("const receiptTypes = new Set(['DELIVERED', 'READ'])");
+    expect(receiptRoutes).toContain("receiptType === 'READ' ? 'message_read' : 'message_delivered'");
   });
 
   it('documents reliability-oriented message service behavior', () => {

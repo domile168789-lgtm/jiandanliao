@@ -24,7 +24,7 @@ describe('publicRoutes', () => {
       [
         {
           platformGroup: 'mobile',
-          projectName: '柬聊',
+          projectName: '柬单聊',
           logoUrl: '/logo.png',
           themeAssetUrl: '/theme.png',
           updatedBy: 'admin-super-1',
@@ -44,7 +44,7 @@ describe('publicRoutes', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       platformGroup: 'mobile',
-      projectName: '柬聊',
+      projectName: '柬单聊',
       logoUrl: '/logo.png',
       themeAssetUrl: '/theme.png',
       updatedBy: 'admin-super-1',

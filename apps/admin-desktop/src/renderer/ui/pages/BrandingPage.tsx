@@ -15,13 +15,13 @@ type UnifiedBrandingFormState = {
 const FALLBACK_ROWS: BrandingRow[] = [
   {
     platformGroup: 'mobile',
-    projectName: '柬聊移动端',
+    projectName: '柬单聊移动端',
     themeAssetUrl: 'https://assets.jianliao.local/mobile-theme.png',
     holidayThemeAssetUrl: 'https://assets.jianliao.local/mobile-holiday-theme.png'
   },
   {
     platformGroup: 'pc',
-    projectName: '柬聊 PC 网页端',
+    projectName: '柬单聊 PC 网页端',
     themeAssetUrl: 'https://assets.jianliao.local/pc-theme.png',
     holidayThemeAssetUrl: 'https://assets.jianliao.local/pc-holiday-theme.png'
   }

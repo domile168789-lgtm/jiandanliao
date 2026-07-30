@@ -122,7 +122,7 @@ export const App = () => {
           <div className="brand-badge">JL</div>
           <div className="brand-copy">
             <div className="brand-eyebrow">系统仪表盘</div>
-            <div className="brand-title">柬聊 Windows 管理后台</div>
+            <div className="brand-title">柬单聊 Windows 管理后台</div>
           </div>
         </div>
 

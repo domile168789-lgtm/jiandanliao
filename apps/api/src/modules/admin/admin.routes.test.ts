@@ -142,7 +142,7 @@ describe('adminRoutes', () => {
       [
         {
           platformGroup: 'mobile',
-          projectName: '柬聊',
+          projectName: '柬单聊',
           logoUrl: '/mobile-logo.png',
           themeAssetUrl: '/mobile-theme.png',
           updatedBy: 'admin-super-1',
@@ -167,7 +167,7 @@ describe('adminRoutes', () => {
     expect(res.json()).toEqual([
       {
         platformGroup: 'mobile',
-        projectName: '柬聊',
+        projectName: '柬单聊',
         logoUrl: '/mobile-logo.png',
         themeAssetUrl: '/mobile-theme.png',
         updatedBy: 'admin-super-1',
@@ -190,7 +190,7 @@ describe('adminRoutes', () => {
         'x-admin-id': '10001'
       },
       payload: {
-        projectName: '柬聊移动端',
+        projectName: '柬单聊移动端',
         logoUrl: '/mobile-logo.png',
         themeAssetUrl: '/mobile-theme.png'
       }
@@ -199,7 +199,7 @@ describe('adminRoutes', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       platformGroup: 'mobile',
-      projectName: '柬聊移动端',
+      projectName: '柬单聊移动端',
       logoUrl: '/mobile-logo.png',
       themeAssetUrl: '/mobile-theme.png',
       updatedBy: '10001',
@@ -210,7 +210,7 @@ describe('adminRoutes', () => {
       [
         expect.any(String),
         'mobile',
-        '柬聊移动端',
+        '柬单聊移动端',
         '/mobile-logo.png',
         '/mobile-theme.png',
         null,

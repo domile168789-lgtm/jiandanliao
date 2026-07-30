@@ -9,7 +9,7 @@ enum AppConfig {
     static let wsBaseURL = "AppConfig.wsBaseURL"
   }
 
-  static let projectName = "柬聊"
+  static let projectName = "柬单聊"
   static let supportEmail = "support@jianliao.local"
   static let supportHotline = "+855 23 600 0000"
   static let walletCurrencyCode = "USD"

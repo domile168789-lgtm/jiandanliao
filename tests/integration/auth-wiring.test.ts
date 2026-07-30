@@ -23,7 +23,7 @@ describe('api auth wiring', () => {
     expect(wsEvents).toContain("type: 'moderation_result'");
     expect(wsEvents).toContain("type: 'activity_published'");
     expect(messageService).toContain("type: 'message_created'");
-    expect(receiptRoutes).toContain("type: 'message_read'");
+    expect(receiptRoutes).toContain("receiptType === 'READ' ? 'message_read' : 'message_delivered'");
     expect(adminService).toContain("category: 'system_notice'");
     expect(adminService).toContain("category: 'moderation_result'");
     expect(activityService).toContain("type: 'activity_published'");
