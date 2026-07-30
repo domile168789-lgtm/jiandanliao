@@ -200,6 +200,14 @@ input {
   font-weight: 700;
 }
 
+.mini-link-icon {
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+  font-size: 28px;
+  line-height: 1;
+}
+
 .button-link {
   border: 0;
   cursor: pointer;

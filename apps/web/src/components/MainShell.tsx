@@ -8,12 +8,6 @@ import {
 import { getErrorMessage } from '../api/loadable';
 import DataModeNotice from './DataModeNotice';
 
-const shortcuts = [
-  { label: '系统通知', to: '/h5/system-notice', hint: '查看公告与风控结果' },
-  { label: '钱包', to: '/h5/wallet', hint: '查看余额与待结算' },
-  { label: '收益', to: '/h5/earnings', hint: '查看今日与本月收益' }
-];
-
 export default function MainShell() {
   const [rows, setRows] = React.useState<ConversationRow[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -69,19 +63,10 @@ export default function MainShell() {
           <h1>消息</h1>
           <p>系统会话、单聊与群聊入口统一收口到这里。</p>
         </div>
-        <Link className="mini-link" to="/h5/contacts">
-          发起单聊
+        <Link aria-label="发起单聊" className="mini-link mini-link-icon" to="/h5/contacts">
+          +
         </Link>
       </header>
-
-      <section className="shortcut-grid" aria-label="快捷入口">
-        {shortcuts.map((shortcut) => (
-          <Link key={shortcut.to} className="shortcut-card" to={shortcut.to}>
-            <strong>{shortcut.label}</strong>
-            <span>{shortcut.hint}</span>
-          </Link>
-        ))}
-      </section>
 
       <section className="placeholder-list" aria-label="消息列表">
         {loading ? <p className="conversation-state">会话加载中...</p> : null}

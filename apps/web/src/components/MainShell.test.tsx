@@ -21,7 +21,7 @@ vi.mock('../api/chat', () => ({
 }));
 
 describe('MainShell', () => {
-  it('renders shortcuts and conversation rows', async () => {
+  it('renders compose entry and conversation rows', async () => {
     render(
       <MemoryRouter>
         <MainShell />
@@ -29,7 +29,7 @@ describe('MainShell', () => {
     );
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('消息');
-    expect(screen.getByRole('link', { name: '系统通知 查看公告与风控结果' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '发起单聊' })).toHaveAttribute('href', '/h5/contacts');
     expect(await screen.findByRole('link', { name: /商务对接/ })).toHaveAttribute(
       'href',
       '/h5/chat/conversation-1'
